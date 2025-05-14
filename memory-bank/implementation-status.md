@@ -12,9 +12,9 @@ This document outlines the current implementation status of features based on th
 
 ### Core E-commerce Admin (Based on original detailed `requirements.md`)
 -   [🟢] **Product Management System** (Backend Service SDK Activated)
-    -   [🟡] **Frontend Admin UI** (`Admin/Products.tsx` & `Admin/ProductForm.tsx` - **Current Focus: Replace mock CF calls with live `httpsCallable`**)
+    -   [✅] **Frontend Admin UI** (`Admin/Products.tsx` & `Admin/ProductForm.tsx` updated to use `httpsCallable` structure with mock fallbacks)
 -   [🟢] **Category Management System** (Backend Service SDK Activated)
-    -   [✅] **Frontend Admin UI** (`Admin/Categories.tsx` structure for CF integration complete with mocks)
+    -   [🟡] **Frontend Admin UI** (`Admin/Categories.tsx` - **Current Focus: Replace mock CF calls with live `httpsCallable`**)
 -   [🟢] **Order Management System** (Backend Service SDK Activated)
     -   [✅] **Frontend Admin UI** (`Admin/Orders.tsx` structure for CF integration complete with mocks)
 -   [🟢] **User Management System** (Backend Service SDK Activated, including Auth Triggers)
@@ -32,16 +32,16 @@ This document outlines the current implementation status of features based on th
 ## Next Steps & Priorities
 
 1.  **Frontend Implementation for Custom Payment Flows**: Core logic structured.
-2.  **Admin Payment Configuration UI**: Done (structurally, pending live CF calls verification).
+2.  **Admin Payment Configuration UI**: Done (structurally, using `httpsCallable` structure with mock fallback).
 3.  **Firebase Client SDK Setup & Live Integration**: 
     *   Ensure `src/lib/firebaseClient.ts` is correctly initialized. (User action)
     *   Verify/update deployed Cloud Function names in frontend calls. (User action)
     *   Update `PaymentMethods.tsx` & `useSiteSettings` hook for live CF calls.
-    *   **Replace mock CF calls in existing Admin UIs with live `httpsCallable` instances.** (**Current Focus: `Admin/Products.tsx` and `Admin/ProductForm.tsx`**)
-    *   Integrate other Admin Panel UIs (e.g., SEO, Theme) and core e-commerce flows (Order placement) to their respective live Cloud Functions.
+    *   **Replace mock CF calls in existing Admin UIs with live `httpsCallable` instances.** (**Current Focus: `Admin/Categories.tsx`**)
+    *   Integrate other Admin Panel UIs (e.g., Order Admin, Customer Admin, Review Admin if not yet done) and core e-commerce flows (Order placement) to their respective live Cloud Functions.
 4.  **Firebase Live Testing**: Deploy backend, test thoroughly with live frontend calls.
 5.  **Complete Core Admin Panel UIs**.
 6.  **Comprehensive Testing**.
 7.  **Address UI/UX Refinements & Design Principles**.
 
-_Current Focus: Replacing mock Cloud Function calls with actual `httpsCallable` structures in Admin Product Management UIs (`Admin/Products.tsx`, `Admin/ProductForm.tsx`)._
+_Current Focus: Replacing mock Cloud Function calls with actual `httpsCallable` structures in Admin Category Management UI (`Admin/Categories.tsx`)._
