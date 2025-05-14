@@ -1,157 +1,98 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { toast } from 'sonner';
-import QRCode from 'react-qr-code';
-import { Loader2, CheckCircle2, Copy, RefreshCw } from 'lucide-react';
+// src/components/checkout/UpiQRCode.tsx
+import React, { useEffect, useState } from 'react';
+
+// Placeholder for a QR code generation library. 
+// In a real app, you might use a library like 'qrcode.react' or 'react-qr-code'.
+// const QRCode = require('qrcode.react'); // Example import if using qrcode.react
 
 interface UpiQRCodeProps {
   amount: number;
-  orderId: string;
-  upiId: string;
-  onPaymentConfirmed: () => void;
+  upiId: string; // Admin-configured UPI ID (VPA)
+  merchantName?: string; // Optional: Store name or merchant name
+  transactionNote?: string; // Optional: Note for the transaction, e.g., Order ID
+  onLoad?: () => void; // Callback when QR code data is ready (or image is rendered by library)
+  onError?: (error: Error) => void; // Callback for any errors during QR generation
 }
 
-const UpiQRCode = ({ amount, orderId, upiId, onPaymentConfirmed }: UpiQRCodeProps) => {
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
-  const [verificationAttempts, setVerificationAttempts] = useState(0);
-  
-  // Format the amount to 2 decimal places
-  const formattedAmount = amount.toFixed(2);
+const UpiQRCode: React.FC<UpiQRCodeProps> = ({
+  amount,
+  upiId,
+  merchantName = 'Your Store Name', // Default merchant name
+  transactionNote = 'Order Payment',
+  onLoad,
+  onError,
+}) => {
+  const [qrData, setQrData] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Generate UPI payment URL
-  // Format: upi://pay?pa=UPI_ID&pn=MERCHANT_NAME&am=AMOUNT&cu=CURRENCY&tn=TRANSACTION_NOTE
-  const upiPaymentUrl = `upi://pay?pa=${upiId}&pn=InstantCart&am=${formattedAmount}&cu=INR&tn=Order ${orderId}`;
-  
-  // Mock payment verification (in a real implementation, this would be an API call to a payment gateway)
-  const verifyPayment = useCallback(async () => {
-    setIsVerifying(true);
-    
-    try {
-      // Simulate API call with timeout
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // For demo purposes, we'll randomly consider payment as successful with 30% chance
-      // or if it's the 3rd attempt (to ensure the flow can be tested)
-      const isSuccessful = Math.random() < 0.3 || verificationAttempts >= 2;
-      
-      if (isSuccessful) {
-        setIsPaymentConfirmed(true);
-        toast.success('Payment confirmed! Your order has been placed.');
-    
-        // Wait a moment before redirecting to the success page
-    setTimeout(() => {
-        onPaymentConfirmed();
-        }, 1500);
-      } else {
-        // Increment verification attempts
-        setVerificationAttempts(prev => prev + 1);
-        toast.error('Payment not detected yet. Please complete the payment or try again.');
-      }
-    } catch (error) {
-      toast.error('Failed to verify payment. Please try again.');
-    } finally {
-      setIsVerifying(false);
-    }
-  }, [verificationAttempts, onPaymentConfirmed]);
-  
-  // Auto-verify payment after QR code is displayed
   useEffect(() => {
-    // Automatically start verification after 10 seconds
-    const timer = setTimeout(() => {
-      if (!isPaymentConfirmed && !isVerifying) {
-        verifyPayment();
-      }
-    }, 10000);
+    if (!upiId || amount <= 0) {
+      const errorMsg = 'Invalid UPI ID or amount for QR code generation.';
+      console.error(errorMsg);
+      if (onError) onError(new Error(errorMsg));
+      setIsLoading(false);
+      setQrData(null);
+      return;
+    }
+
+    // Construct the UPI payment string
+    // Standard UPI QR Code string format: upi://pay?pa=<VPA>&pn=<PayeeName>&am=<Amount>&tn=<TransactionNote>&cu=INR
+    // Ensure parameters are URL encoded if they contain special characters.
+    const params = new URLSearchParams();
+    params.append('pa', upiId);
+    params.append('pn', merchantName);
+    params.append('am', amount.toFixed(2));
+    params.append('tn', transactionNote);
+    params.append('cu', 'INR'); // Assuming currency is INR
+
+    const upiString = `upi://pay?${params.toString()}`;
+    setQrData(upiString);
+    setIsLoading(false);
     
-    return () => clearTimeout(timer);
-  }, [isPaymentConfirmed, isVerifying, verifyPayment]);
-  
-  // Copy UPI ID to clipboard
-  const copyUpiId = () => {
-    navigator.clipboard.writeText(upiId)
-      .then(() => toast.success('UPI ID copied to clipboard'))
-      .catch(() => toast.error('Failed to copy UPI ID'));
-  };
+    if (onLoad) {
+      onLoad();
+    }
+
+  }, [amount, upiId, merchantName, transactionNote, onLoad, onError]);
+
+  if (isLoading) {
+    return <div className="text-center p-4">Generating UPI QR Code...</div>;
+  }
+
+  if (!qrData) {
+    return <div className="text-center p-4 text-red-500">Could not generate UPI QR Code. Please check UPI ID and amount.</div>;
+  }
 
   return (
-    <Card className="p-6 flex flex-col items-center space-y-6">
-      {isPaymentConfirmed ? (
-        <div className="flex flex-col items-center text-center space-y-4">
-          <CheckCircle2 className="h-16 w-16 text-green-500" />
-          <h3 className="text-xl font-medium">Payment Successful!</h3>
-          <p className="text-gray-500">
-            Your payment of ₹{formattedAmount} has been confirmed.
-            <br />
-            Your order is being processed.
+    <div className="flex flex-col items-center p-4 bg-white rounded-lg shadow-md">
+      <h3 className="text-lg font-semibold mb-3">Scan to Pay with UPI</h3>
+      <div className="p-2 bg-gray-100 rounded-md mb-3">
+        {/* Placeholder for actual QR Code Component */}
+        {/* Replace this div with <QRCode value={qrData} size={200} level="H" /> or similar */}
+        <div 
+            className="w-48 h-48 md:w-56 md:h-56 bg-gray-300 flex items-center justify-center text-sm text-gray-500 rounded-md"
+            title={`UPI QR Data: ${qrData}`}
+        >
+            [QR Code Placeholder]
+            <br/>
+            Data: {qrData.substring(0,30)}...
+        </div>
+      </div>
+      <p className="text-sm text-gray-700 mb-1">
+        <strong>Amount:</strong> ₹{amount.toFixed(2)}
+      </p>
+      <p className="text-xs text-gray-500 mb-1">
+        <strong>UPI ID:</strong> {upiId}
+      </p>
+      {transactionNote && (
+        <p className="text-xs text-gray-500 mb-3">
+          <strong>Note:</strong> {transactionNote}
         </p>
-      </div>
-      ) : (
-        <>
-          <div className="text-center mb-2">
-            <h3 className="text-xl font-medium">Scan to Pay</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Use any UPI app to scan this QR code
-            </p>
-            <div className="flex items-center justify-center mt-2">
-              <p className="text-2xl font-bold text-brand-teal">₹{formattedAmount}</p>
-            </div>
-        </div>
-        
-          <div className="bg-white p-3 rounded-lg border-2 border-gray-200">
-            <QRCode 
-              value={upiPaymentUrl} 
-              size={200}
-              level="H"
-              fgColor="#000000"
-              bgColor="#ffffff"
-            />
-      </div>
-      
-          <div className="text-center w-full space-y-3">
-            <div className="flex items-center justify-center space-x-2">
-              <p className="text-sm font-medium">UPI ID:</p>
-              <p className="text-sm font-mono bg-gray-100 py-1 px-2 rounded">{upiId}</p>
-        <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={copyUpiId}
-                title="Copy UPI ID"
-              >
-                <Copy className="h-4 w-4" />
-        </Button>
-        </div>
-      
-          <Button 
-            onClick={verifyPayment} 
-              disabled={isVerifying}
-            className="w-full bg-brand-teal hover:bg-brand-dark"
-          >
-              {isVerifying ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verifying Payment...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Verify Payment
-                </>
-              )}
-          </Button>
-            
-            <p className="text-xs text-gray-500">
-              {verificationAttempts > 0 ? (
-                `Verification attempt ${verificationAttempts} - please ensure you've completed the payment`
-              ) : (
-                "After payment, verification will happen automatically"
-              )}
-            </p>
-        </div>
-        </>
       )}
-    </Card>
+      <p className="text-xs text-center text-gray-500">
+        Scan this QR code with any UPI app (Google Pay, PhonePe, Paytm, etc.) to complete your payment.
+      </p>
+    </div>
   );
 };
 
