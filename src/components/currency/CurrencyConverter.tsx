@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ArrowRight, RefreshCw } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { Currency } from '@/types/currency';
@@ -40,12 +40,7 @@ export const CurrencyConverter = ({
     }
   }, [currencies]);
 
-  useEffect(() => {
-    // Perform conversion when any relevant state changes
-    handleConvert();
-  }, [amount, fromCurrency, toCurrency]);
-
-  const handleConvert = () => {
+  const handleConvert = useCallback(() => {
     const fromCurrencyObj = currencies.find(c => c.code === fromCurrency);
     const toCurrencyObj = currencies.find(c => c.code === toCurrency);
     
@@ -54,7 +49,12 @@ export const CurrencyConverter = ({
       const result = convert(amount, fromCurrency);
       setConvertedAmount(result);
     }
-  };
+  }, [currencies, convert, amount, fromCurrency, toCurrency]);
+
+  useEffect(() => {
+    // Perform conversion when any relevant state changes
+    handleConvert();
+  }, [amount, fromCurrency, toCurrency, handleConvert]);
 
   const swapCurrencies = () => {
     setFromCurrency(toCurrency);

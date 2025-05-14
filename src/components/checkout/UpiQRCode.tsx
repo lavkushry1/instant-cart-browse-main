@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -25,7 +25,7 @@ const UpiQRCode = ({ amount, orderId, upiId, onPaymentConfirmed }: UpiQRCodeProp
   const upiPaymentUrl = `upi://pay?pa=${upiId}&pn=InstantCart&am=${formattedAmount}&cu=INR&tn=Order ${orderId}`;
   
   // Mock payment verification (in a real implementation, this would be an API call to a payment gateway)
-  const verifyPayment = async () => {
+  const verifyPayment = useCallback(async () => {
     setIsVerifying(true);
     
     try {
@@ -54,7 +54,7 @@ const UpiQRCode = ({ amount, orderId, upiId, onPaymentConfirmed }: UpiQRCodeProp
     } finally {
       setIsVerifying(false);
     }
-  };
+  }, [verificationAttempts, onPaymentConfirmed]);
   
   // Auto-verify payment after QR code is displayed
   useEffect(() => {
@@ -66,7 +66,7 @@ const UpiQRCode = ({ amount, orderId, upiId, onPaymentConfirmed }: UpiQRCodeProp
     }, 10000);
     
     return () => clearTimeout(timer);
-  }, [isPaymentConfirmed, isVerifying]);
+  }, [isPaymentConfirmed, isVerifying, verifyPayment]);
   
   // Copy UPI ID to clipboard
   const copyUpiId = () => {

@@ -300,23 +300,24 @@ export const getEnabledScripts = async (consentCategories: ConsentCategory[] = [
  * Generate tracking script HTML for embedding
  */
 export const generateScriptTags = async (consentCategories: ConsentCategory[]): Promise<Record<ScriptLocation, string>> => {
-  return new Promise(async resolve => {
-    setTimeout(async () => {
-      const enabledScripts = await getEnabledScripts(consentCategories);
-      
-      // Group scripts by location
-      const scriptsByLocation: Record<ScriptLocation, string> = {
-        'head': '',
-        'body-start': '',
-        'body-end': ''
-      };
-      
-      // Generate HTML for each script
-      enabledScripts.forEach(script => {
-        scriptsByLocation[script.location] += script.content + '\n';
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      getEnabledScripts(consentCategories).then(enabledScripts => {
+        // Group scripts by location
+        const scriptsByLocation: Record<ScriptLocation, string> = {
+          'head': '',
+          'body-start': '',
+          'body-end': ''
+        };
+        
+        // Generate HTML for each script
+        enabledScripts.forEach(script => {
+          scriptsByLocation[script.location] += `${script.content}
+`;
+        });
+        
+        resolve(scriptsByLocation);
       });
-      
-      resolve(scriptsByLocation);
     }, 300);
   });
 };

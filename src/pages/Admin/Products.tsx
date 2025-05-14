@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { 
@@ -55,7 +55,6 @@ const AdminProducts = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<keyof Product>('name');
@@ -70,7 +69,6 @@ const AdminProducts = () => {
         setIsLoading(true);
         const data = await getProducts();
         setProducts(data);
-        setFilteredProducts(data);
       } catch (error) {
         console.error('Error fetching products:', error);
         toast.error('Failed to load products');
@@ -82,24 +80,8 @@ const AdminProducts = () => {
     fetchProducts();
   }, []);
 
-  // Handle search
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredProducts(products);
-    } else {
-      const lowercaseQuery = searchQuery.toLowerCase();
-      const filtered = products.filter(product => 
-        product.name.toLowerCase().includes(lowercaseQuery) || 
-        product.category.toLowerCase().includes(lowercaseQuery) ||
-        product.tags.some(tag => tag.toLowerCase().includes(lowercaseQuery))
-      );
-      setFilteredProducts(filtered);
-    }
-  }, [searchQuery, products]);
-
-  // Handle sort
-  useEffect(() => {
-    const sorted = [...filteredProducts].sort((a, b) => {
+  const sortedProducts = useMemo(() => {
+    return [...products].sort((a, b) => {
       if (sortField === 'price' || sortField === 'stock') {
         return sortDirection === 'asc' 
           ? a[sortField] - b[sortField]
@@ -112,8 +94,19 @@ const AdminProducts = () => {
           : bValue.localeCompare(aValue);
       }
     });
-    setFilteredProducts(sorted);
-  }, [sortField, sortDirection]);
+  }, [products, sortField, sortDirection]);
+
+  const filteredProducts = useMemo(() => {
+    if (searchQuery.trim() === '') {
+      return sortedProducts;
+    }
+    const lowercaseQuery = searchQuery.toLowerCase();
+    return sortedProducts.filter(product => 
+      product.name.toLowerCase().includes(lowercaseQuery) || 
+      product.category.toLowerCase().includes(lowercaseQuery) ||
+      product.tags.some(tag => tag.toLowerCase().includes(lowercaseQuery))
+    );
+  }, [searchQuery, sortedProducts]);
 
   // Handle sorting click
   const handleSort = (field: keyof Product) => {
@@ -139,9 +132,7 @@ const AdminProducts = () => {
       await deleteProduct(productToDelete.id);
       
       // Update products list
-      const updatedProducts = products.filter(p => p.id !== productToDelete.id);
-      setProducts(updatedProducts);
-      setFilteredProducts(updatedProducts);
+      setProducts(prevProducts => prevProducts.filter(p => p.id !== productToDelete.id));
       
       toast.success('Product deleted successfully');
       setDeleteDialogOpen(false);
@@ -239,7 +230,9 @@ const AdminProducts = () => {
                           className="flex items-center text-left font-medium"
                         >
                           Product Name
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                          {sortField === 'name' && (
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          )}
                         </Button>
                       </TableHead>
                       <TableHead>
@@ -249,7 +242,9 @@ const AdminProducts = () => {
                           className="flex items-center text-left font-medium"
                         >
                           Category
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                          {sortField === 'category' && (
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          )}
                         </Button>
                       </TableHead>
                       <TableHead className="text-right">
@@ -259,7 +254,9 @@ const AdminProducts = () => {
                           className="flex items-center justify-end font-medium ml-auto"
                         >
                           Price
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                          {sortField === 'price' && (
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          )}
                         </Button>
                       </TableHead>
                       <TableHead className="text-right">
@@ -269,7 +266,9 @@ const AdminProducts = () => {
                           className="flex items-center justify-end font-medium ml-auto"
                         >
                           Stock
-                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                          {sortField === 'stock' && (
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          )}
                         </Button>
                       </TableHead>
                       <TableHead className="text-center">Status</TableHead>

@@ -98,7 +98,7 @@ const ProductForm = () => {
         }
 
         // Fetch SEO data if in edit mode
-        if (productId) {
+        if (productId && productId !== 'new') { // Modified this line to ensure productId is not 'new'
           const fetchSEO = async () => {
             try {
               const seo = await getProductSEO(productId);
@@ -135,7 +135,7 @@ const ProductForm = () => {
     };
     
     initialize();
-  }, [productId, isEditMode, navigate]);
+  }, [productId, isEditMode, navigate, formData.name, formData.description, formData.tags]);
 
   // Handle text input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
