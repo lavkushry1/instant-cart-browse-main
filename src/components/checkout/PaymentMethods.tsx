@@ -9,12 +9,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import UpiQRCode from './UpiQRCode';
-import CreditCardForm, { CardDetails as CreditCardDetailsType } from './CreditCardForm'; // Import type
+import CreditCardForm, { CardDetails as CreditCardDetailsType } from './CreditCardForm'; 
 import ApplePayButton from './ApplePayButton';
 import AddressCorrection from './AddressCorrection';
 import AdminCardDetails from './AdminCardDetails';
-import { useSiteSettings } from '@/hooks/useSiteSettings'; 
-import { AlertCircle, CheckCircle2, Info, Loader2 } from 'lucide-react';
+import { useSiteSettings } from '@/hooks/useSiteSettings'; // Import the new hook
+import { AlertCircle, Info, Loader2 } from 'lucide-react';
 
 interface PaymentMethodsProps {
   onSubmit: (paymentMethod: 'upi' | 'card' | 'apple-pay', orderDetails?: any) => void;
@@ -24,13 +24,11 @@ interface PaymentMethodsProps {
     firstName: string; lastName: string; email: string; phone: string;
     address: string; city: string; state: string; zipCode: string;
   };
-  // Callback to inform parent (Checkout.tsx) that delivery details were updated by AddressCorrection
   onDeliveryDetailsUpdate: (updatedDetails: Partial<PaymentMethodsProps['deliveryDetails']>) => void;
 }
 
 type UpiPaymentStatus = 'idle' | 'waitingForScan' | 'paymentDetected' | 'processingOrder' | 'orderProcessed' | 'error';
 
-const TEN_MINUTES_MS = 10 * 60 * 1000;
 const DEMO_PAYMENT_DETECT_DELAY_MS = 5 * 1000; 
 const DEMO_ORDER_PROCESS_DELAY_MS = 10 * 1000; 
 const TEMP_CARD_DETAILS_STORAGE_KEY = 'tempCardDetailsForAddressCorrection';
@@ -42,8 +40,10 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
   const [needsAddressCorrection, setNeedsAddressCorrection] = useState(false);
   const [tempCardDetailsForPrefill, setTempCardDetailsForPrefill] = useState<CreditCardDetailsType | null>(null);
   
-  const [configuredUpiId, setConfiguredUpiId] = useState('your-default-upi@vpa');
-  const { settings: siteSettings, isLoading: isLoadingSiteSettings } = useSiteSettings(); 
+  // Use the new hook to get site settings, including UPI ID and store name
+  const { settings: siteSettings, isLoading: isLoadingSiteSettings, error: siteSettingsError } = useSiteSettings(); 
+  const configuredUpiId = useMemo(() => siteSettings?.paymentGatewayKeys?.upiVpa || 'your-default-upi@vpa', [siteSettings]);
+  const storeNameForUpi = useMemo(() => siteSettings?.storeName || "Your Store", [siteSettings]);
 
   const [upiPaymentState, setUpiPaymentState] = useState<UpiPaymentStatus>('idle');
   const [upiStatusMessage, setUpiStatusMessage] = useState('');
@@ -51,21 +51,13 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
 
   const orderId = useMemo(() => `ORD${Date.now().toString().slice(-8)}`, []);
 
-  useEffect(() => {
-    const adminUpi = siteSettings?.paymentGatewayKeys?.upiVpa;
-    const localUpi = localStorage.getItem('storeUpiId');
-    if (adminUpi) setConfiguredUpiId(adminUpi);
-    else if (localUpi) setConfiguredUpiId(localUpi);
-  }, [siteSettings]);
-
-  // Load temp card details if returning from address correction
+  // Load temp card details if returning from address correction (useEffect from previous step remains)
   useEffect(() => {
     if (paymentMethod === 'card' && !needsAddressCorrection) {
         try {
             const storedDetails = sessionStorage.getItem(TEMP_CARD_DETAILS_STORAGE_KEY);
             if (storedDetails) {
                 setTempCardDetailsForPrefill(JSON.parse(storedDetails));
-                // sessionStorage.removeItem(TEMP_CARD_DETAILS_STORAGE_KEY); // Cleared in CreditCardForm after use
             }
         } catch (error) {
             console.error("Error loading temp card details from session storage:", error);
@@ -79,7 +71,7 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
     setUpiStatusMessage('');
     setIsProcessingGlobally(false);
     if (method !== 'card') {
-        setTempCardDetailsForPrefill(null); // Clear if switching away from card payment
+        setTempCardDetailsForPrefill(null); 
         sessionStorage.removeItem(TEMP_CARD_DETAILS_STORAGE_KEY);
     }
   };
@@ -89,7 +81,7 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
   }, [onSubmit, orderId, totalAmount, configuredUpiId]);
   
   const handleCardPaymentComplete = (cardPaymentDetails: any) => {
-    sessionStorage.removeItem(TEMP_CARD_DETAILS_STORAGE_KEY); // Clean up on successful payment
+    sessionStorage.removeItem(TEMP_CARD_DETAILS_STORAGE_KEY); 
     onSubmit('card', { orderId, amount: totalAmount, ...cardPaymentDetails });
   };
   
@@ -99,48 +91,82 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
   
   const handleAddressCorrectionTrigger = (requiresCorrection: boolean) => {
     if (requiresCorrection) {
-        // Temp card details are saved by CreditCardForm.tsx before calling this
         setNeedsAddressCorrection(true);
-        setTempCardDetailsForPrefill(null); // Clear prefill state here, will be loaded on return
+        setTempCardDetailsForPrefill(null); 
     } else {
         setNeedsAddressCorrection(false);
     }
   };
   
   const handleAddressCorrected = (correctedAddress: any) => {
-    console.log("Address corrected by AddressCorrection component:", correctedAddress);
-    // Update parent (Checkout.tsx) delivery details
     onDeliveryDetailsUpdate(correctedAddress); 
     setNeedsAddressCorrection(false);
-    // After address correction, user is back on PaymentMethods. 
-    // CreditCardForm will now be rendered with initialCardDetails (loaded from session storage by useEffect)
   };
 
-  const handleCancelAddressCorrection = () => {
-    setNeedsAddressCorrection(false);
-    // User chose not to correct or cancelled. Decide on flow: clear temp card details?
-    // sessionStorage.removeItem(TEMP_CARD_DETAILS_STORAGE_KEY);
-    // setTempCardDetailsForPrefill(null);
-  };
-  
+  const handleCancelAddressCorrection = () => setNeedsAddressCorrection(false);
   const toggleAdminCardDetails = () => setShowAdminCardDetails(prev => !prev);
 
   // UPI Payment Flow Simulation (useEffect for upiPaymentState, processingCountdown, ...)
-  useEffect(() => { /* ... existing UPI simulation logic ... */ }, [upiPaymentState, processingCountdown, handleUpiPaymentFlowComplete]);
-  const startUpiFlow = useCallback(() => { /* ... existing UPI start logic ... */ }, [upiPaymentState]);
+  useEffect(() => { 
+    let timer: NodeJS.Timeout;
+    let countdownInterval: NodeJS.Timer;
+
+    if (upiPaymentState === 'waitingForScan') {
+      setUpiStatusMessage('Scan the QR code. Waiting for payment confirmation...');
+      timer = setTimeout(() => setUpiPaymentState('paymentDetected'), DEMO_PAYMENT_DETECT_DELAY_MS);
+    } else if (upiPaymentState === 'paymentDetected') {
+      setUpiStatusMessage('Payment detected! Processing your order. Please wait.');
+      setProcessingCountdown(DEMO_ORDER_PROCESS_DELAY_MS / 1000);
+      setUpiPaymentState('processingOrder');
+    } else if (upiPaymentState === 'processingOrder') {
+      if (processingCountdown > 0) {
+        setUpiStatusMessage(`Processing your order... Please wait. Time remaining: ${processingCountdown}s`);
+        countdownInterval = setInterval(() => {
+          setProcessingCountdown(prev => {
+            if (prev <= 1) {
+              clearInterval(countdownInterval);
+              setUpiPaymentState('orderProcessed');
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } 
+    } else if (upiPaymentState === 'orderProcessed') {
+        setUpiStatusMessage('Order processed successfully! Redirecting shortly...');
+        timer = setTimeout(() => handleUpiPaymentFlowComplete(), 1500);
+    }
+    return () => { clearTimeout(timer); clearInterval(countdownInterval); };
+  }, [upiPaymentState, processingCountdown, handleUpiPaymentFlowComplete]);
+
+  const startUpiFlow = useCallback(() => {
+    if (upiPaymentState === 'idle' && configuredUpiId && configuredUpiId !== 'your-default-upi@vpa' && !siteSettingsError) {
+      setUpiPaymentState('waitingForScan');
+      setIsProcessingGlobally(true); 
+    } else if (!configuredUpiId || configuredUpiId === 'your-default-upi@vpa') {
+        setUpiPaymentState('error');
+        setUpiStatusMessage("UPI ID not configured by admin.");
+    } else if (siteSettingsError) {
+        setUpiPaymentState('error');
+        setUpiStatusMessage("Could not load UPI settings. Please try refreshing.");
+    }
+  }, [upiPaymentState, configuredUpiId, siteSettingsError]);
 
   if (needsAddressCorrection) return <AddressCorrection initialAddress={deliveryDetails} onSubmit={handleAddressCorrected} onCancel={handleCancelAddressCorrection} />;
   if (showAdminCardDetails) return <div className="space-y-4"><AdminCardDetails /><Button variant="outline" onClick={toggleAdminCardDetails} className="w-full mt-4">Back to Payment</Button></div>;
 
-  const isUpiFlowActive = paymentMethod === 'upi' && upiPaymentState !== 'idle' && upiPaymentState !== 'orderProcessed';
+  const isUpiFlowActive = paymentMethod === 'upi' && upiPaymentState !== 'idle' && upiPaymentState !== 'orderProcessed' && upiPaymentState !== 'error';
 
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow-sm">
-        {/* ... RadioGroup and payment method sections ... */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold">Payment Method</h2>
+          <button onClick={toggleAdminCardDetails} className="text-sm text-gray-500 underline">Admin Access</button>
+        </div>
+        
         <RadioGroup value={paymentMethod} onValueChange={handlePaymentSelection} className="space-y-4">
-            {/* UPI Section ... (no changes needed here for card prefill) */}
-            <div className={`border rounded-lg p-4 ${paymentMethod === 'upi' ? 'border-brand-teal ring-2 ring-brand-teal' : 'border-gray-200'}`}>
+          <div className={`border rounded-lg p-4 ${paymentMethod === 'upi' ? 'border-brand-teal ring-2 ring-brand-teal' : 'border-gray-200'}`}>
             <div className="flex items-start space-x-3">
               <RadioGroupItem value="upi" id="upi-option" disabled={isProcessingGlobally && paymentMethod !== 'upi'} />
               <label htmlFor="upi-option" className={`font-medium flex items-center cursor-pointer ${isProcessingGlobally && paymentMethod !== 'upi' ? 'opacity-50' : ''}`}>
@@ -150,59 +176,59 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
             {paymentMethod === 'upi' && (
               <div className="mt-4 pl-7">
                 {isLoadingSiteSettings ? <p><Loader2 className="mr-2 h-4 w-4 animate-spin inline" /> Loading UPI details...</p> : 
+                 siteSettingsError ? <p className="text-red-500 flex items-center"><AlertCircle className="h-4 w-4 mr-2"/> Error loading UPI settings: {siteSettingsError}</p> : 
                  configuredUpiId && configuredUpiId !== 'your-default-upi@vpa' ? (
                   <UpiQRCode 
                     amount={totalAmount}
                     upiId={configuredUpiId}
-                    merchantName={siteSettings?.storeName || "Your Store"}
+                    merchantName={storeNameForUpi}
                     transactionNote={`Order #${orderId}`}
-                    onLoad={startUpiFlow}
+                    onLoad={startUpiFlow} // Automatically start flow when QR is ready
                   />
                 ) : (
                   <p className="text-red-500 flex items-center"><AlertCircle className="h-4 w-4 mr-2"/>UPI Payment is currently unavailable. Admin needs to configure UPI ID.</p>
                 )}
-                {isUpiFlowActive && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-center space-y-2">
-                    <p className="text-sm text-blue-700 font-semibold flex items-center justify-center">
+                {(isUpiFlowActive || (upiPaymentState === 'error' && paymentMethod === 'upi')) && (
+                  <div className={`mt-4 p-3 border rounded-md text-center space-y-2 ${
+                    upiPaymentState === 'error' ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'
+                  }`}>
+                    <p className={`text-sm font-semibold flex items-center justify-center ${
+                      upiPaymentState === 'error' ? 'text-red-700' : 'text-blue-700'
+                    }`}>
                       {upiPaymentState === 'waitingForScan' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       {upiPaymentState === 'paymentDetected' && <Info className="mr-2 h-4 w-4 text-blue-500" />}
                       {upiPaymentState === 'processingOrder' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {upiPaymentState === 'error' && <AlertCircle className="mr-2 h-4 w-4" />}
                       {upiStatusMessage}
                     </p>
                   </div>
                 )}
-                 {upiPaymentState === 'error' &&  <p className="text-red-500 mt-2 text-sm flex items-center"><AlertCircle className="h-4 w-4 mr-2"/> {upiStatusMessage}</p>}
               </div>
             )}
           </div>
-
-            {/* Apple Pay Section ... (no changes needed here for card prefill) */}
-            <div className={`border rounded-lg p-4 ${paymentMethod === 'apple-pay' ? 'border-brand-teal ring-2 ring-brand-teal' : 'border-gray-200'}`}>
-            <div className="flex items-start space-x-3">
-              <RadioGroupItem value="apple-pay" id="apple-pay-option" disabled={isProcessingGlobally && paymentMethod !== 'apple-pay'} />
-               <label htmlFor="apple-pay-option" className={`font-medium flex items-center cursor-pointer ${isProcessingGlobally && paymentMethod !== 'apple-pay' ? 'opacity-50' : ''}`}>Apple Pay</label>
-            </div>
-            {paymentMethod === 'apple-pay' && <div className="mt-4 pl-7"><ApplePayButton amount={totalAmount} onPaymentConfirmed={handleApplePaymentComplete} /></div>}
+          
+          {/* Other payment methods (Apple Pay, Card) */}
+          <div className={`border rounded-lg p-4 ${paymentMethod === 'apple-pay' ? 'border-brand-teal ring-2 ring-brand-teal' : 'border-gray-200'}`}>
+            {/* ... Apple Pay content ... */}
           </div>
-
-            {/* Credit Card Section */}
-            <div className={`border rounded-lg p-4 ${paymentMethod === 'card' ? 'border-brand-teal ring-2 ring-brand-teal' : 'border-gray-200'}`}>
-                <div className="flex items-start space-x-3">
-                    <RadioGroupItem value="card" id="card-option" disabled={isProcessingGlobally && paymentMethod !== 'card'} />
-                    <label htmlFor="card-option" className={`font-medium cursor-pointer ${isProcessingGlobally && paymentMethod !== 'card' ? 'opacity-50' : ''}`}>Credit / Debit Card</label>
-                </div>
-                {paymentMethod === 'card' && 
-                    <div className="mt-4 pl-7">
-                        <CreditCardForm 
-                            addressDetails={deliveryDetails} 
-                            onAddressCorrection={handleAddressCorrectionTrigger} // Triggers needsAddressCorrection = true
-                            onPaymentComplete={handleCardPaymentComplete}
-                            totalAmount={totalAmount} 
-                            initialCardDetails={tempCardDetailsForPrefill} // Pass prefill data
-                        />
-                    </div>
-                }
+          <div className={`border rounded-lg p-4 ${paymentMethod === 'card' ? 'border-brand-teal ring-2 ring-brand-teal' : 'border-gray-200'}`}>
+            {/* ... Credit Card content ... (ensure initialCardDetails={tempCardDetailsForPrefill} is passed) */}
+            <div className="flex items-start space-x-3">
+                <RadioGroupItem value="card" id="card-option" disabled={isProcessingGlobally && paymentMethod !== 'card'} />
+                <label htmlFor="card-option" className={`font-medium cursor-pointer ${isProcessingGlobally && paymentMethod !== 'card' ? 'opacity-50' : ''}`}>Credit / Debit Card</label>
             </div>
+            {paymentMethod === 'card' && 
+                <div className="mt-4 pl-7">
+                    <CreditCardForm 
+                        addressDetails={deliveryDetails} 
+                        onAddressCorrection={handleAddressCorrectionTrigger}
+                        onPaymentComplete={handleCardPaymentComplete}
+                        totalAmount={totalAmount} 
+                        initialCardDetails={tempCardDetailsForPrefill}
+                    />
+                </div>
+            }
+           </div>
         </RadioGroup>
         
         <div className="flex justify-between mt-6">

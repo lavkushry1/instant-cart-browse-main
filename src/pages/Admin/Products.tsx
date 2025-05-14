@@ -1,374 +1,187 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  ArrowUpDown,
-  Check,
-  X
-} from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Eye, ArrowUpDown, X, Loader2 } from 'lucide-react'; // Added Loader2
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { useAuth } from '@/hooks/useAuth';
-import { Product } from '@/types/product';
-import { getProducts, deleteProduct } from '@/services/productService';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AdminLayout from '@/components/layout/AdminLayout';
+import { Product } from '@/services/productService'; // Backend type
+
+import { functionsClient } from '@/lib/firebaseClient';
+import { httpsCallable, HttpsCallableResult } from 'firebase/functions';
+import { GetAllProductsOptionsBE } from '@/services/productService'; 
+
+// Define callable functions
+let getAllProductsAdminCF: HttpsCallable<GetAllProductsOptionsBE | undefined, HttpsCallableResult<{ success: boolean; products?: Product[]; totalCount?: number; error?: string }>> | undefined;
+let deleteProductAdminCF: HttpsCallable<{ productId: string }, HttpsCallableResult<{ success: boolean; message?: string; error?: string }>> | undefined;
+
+if (functionsClient && Object.keys(functionsClient).length > 0) {
+  try {
+    // Assuming functions are exported as products.getAllProductsCF and products.deleteProductCF
+    // The name for httpsCallable is typically 'groupName-functionName' or just 'functionName' if not grouped in index.ts
+    getAllProductsAdminCF = httpsCallable(functionsClient, 'products-getAllProductsCF'); 
+    deleteProductAdminCF = httpsCallable(functionsClient, 'products-deleteProductCF');
+    console.log("AdminProducts: Live httpsCallable references created.");
+  } catch (error) {
+    console.error("AdminProducts: Error preparing httpsCallable functions:", error);
+    toast.error("Error initializing connection to product service.");
+  }
+} else {
+    console.warn("AdminProducts: Firebase functions client not available. Product operations will be mocked or fail.");
+}
+
+// Fallback mock if live function is not available
+const callGetAllProductsCFMock = async (options?: GetAllProductsOptionsBE): Promise<HttpsCallableResult<{ success: boolean, products?: Product[], totalCount?: number, error?: string }>> => {
+    console.warn("MOCK callGetAllProductsCF with options:", options);
+    await new Promise(r => setTimeout(r, 500));
+    const mockProducts: Product[] = [
+        { id: '1', name: 'Mock Laptop Pro', categoryId: 'electronics', categoryName: 'Electronics', price: 1200, stock: 15, isEnabled: true, images:['/placeholder.svg'], description:'', createdAt: new Date(), updatedAt: new Date(), tags:['mock'], featured: false },
+        { id: '2', name: 'Mock T-Shirt Fun', categoryId: 'clothing', categoryName: 'Clothing', price: 25, stock: 100, isEnabled: true, images:['/placeholder.svg'], description:'', createdAt: new Date(), updatedAt: new Date(), tags:['mock'], featured: true },
+    ];
+    return { data: { success: true, products: mockProducts, totalCount: mockProducts.length } };
+};
 
 const AdminProducts = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState<keyof Product>('name');
+  const [sortField, setSortField] = useState<keyof Product | string>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
-  // Fetch products on component mount
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setIsLoading(true);
-        const data = await getProducts();
-        setProducts(data);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        toast.error('Failed to load products');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const options: GetAllProductsOptionsBE = { isEnabled: undefined /* Fetch all */, sortBy: 'createdAt', sortOrder: 'desc' };
+      const result = getAllProductsAdminCF 
+        ? await getAllProductsAdminCF(options) 
+        : await callGetAllProductsCFMock(options);
 
-    fetchProducts();
+      if (result.data.success && result.data.products) {
+        setProducts(result.data.products.map(p => ({...p, category: p.categoryName || p.categoryId } as Product)));
+      } else {
+        toast.error(result.data.error || 'Failed to load products');
+        setProducts([]);
+      }
+    } catch (error: any) {
+      console.error('Error fetching products:', error);
+      toast.error(`Failed to load products: ${error.message || 'Unknown error'}`);
+      setProducts([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const sortedProducts = useMemo(() => {
-    return [...products].sort((a, b) => {
-      if (sortField === 'price' || sortField === 'stock') {
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+  const sortedAndFilteredProducts = useMemo(() => {
+    let items = [...products];
+    if (searchQuery.trim() !== '') {
+      const lcQuery = searchQuery.toLowerCase();
+      items = items.filter(p => 
+        p.name.toLowerCase().includes(lcQuery) || 
+        (p.categoryName || p.categoryId).toLowerCase().includes(lcQuery) ||
+        (p.tags && p.tags.some(tag => tag.toLowerCase().includes(lcQuery)))
+      );
+    }
+    items.sort((a, b) => {
+        const aVal = (a as any)[sortField];
+        const bVal = (b as any)[sortField];
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+            return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+        }
         return sortDirection === 'asc' 
-          ? a[sortField] - b[sortField]
-          : b[sortField] - a[sortField];
-      } else {
-        const aValue = String(a[sortField]).toLowerCase();
-        const bValue = String(b[sortField]).toLowerCase();
-        return sortDirection === 'asc'
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      }
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
     });
-  }, [products, sortField, sortDirection]);
+    return items;
+  }, [products, searchQuery, sortField, sortDirection]);
 
-  const filteredProducts = useMemo(() => {
-    if (searchQuery.trim() === '') {
-      return sortedProducts;
-    }
-    const lowercaseQuery = searchQuery.toLowerCase();
-    return sortedProducts.filter(product => 
-      product.name.toLowerCase().includes(lowercaseQuery) || 
-      product.category.toLowerCase().includes(lowercaseQuery) ||
-      product.tags.some(tag => tag.toLowerCase().includes(lowercaseQuery))
-    );
-  }, [searchQuery, sortedProducts]);
-
-  // Handle sorting click
-  const handleSort = (field: keyof Product) => {
-    if (field === sortField) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
+  const handleSort = (field: keyof Product | string) => {
+    if (field === sortField) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDirection('asc'); }
   };
 
-  // Handle delete confirmation
-  const handleDeleteClick = (product: Product) => {
-    setProductToDelete(product);
-    setDeleteDialogOpen(true);
-  };
+  const handleDeleteClick = (product: Product) => { setProductToDelete(product); setDeleteDialogOpen(true); };
 
-  // Handle delete product
   const handleDeleteConfirm = async () => {
     if (!productToDelete) return;
-    
+    if (!deleteProductAdminCF) { toast.error("Delete function not available."); return; }
     try {
-      await deleteProduct(productToDelete.id);
-      
-      // Update products list
-      setProducts(prevProducts => prevProducts.filter(p => p.id !== productToDelete.id));
-      
-      toast.success('Product deleted successfully');
-      setDeleteDialogOpen(false);
-      setProductToDelete(null);
-    } catch (error) {
+      const result = await deleteProductAdminCF({ productId: productToDelete.id });
+      if (result.data.success) {
+        setProducts(prev => prev.filter(p => p.id !== productToDelete!.id));
+        toast.success('Product deleted successfully');
+      } else {
+        toast.error(result.data.error || 'Failed to delete product');
+      }
+    } catch (error: any) {
       console.error('Error deleting product:', error);
-      toast.error('Failed to delete product');
+      toast.error(`Failed to delete product: ${error.message || 'Unknown error'}`);
     }
+    setDeleteDialogOpen(false); setProductToDelete(null);
   };
 
-  // Navigate to add new product page
-  const handleAddNew = () => {
-    navigate('/admin/products/new');
-  };
-
-  // Navigate to edit product page
-  const handleEdit = (productId: string) => {
-    navigate(`/admin/products/edit/${productId}`);
-  };
-
-  // Navigate to view product page
-  const handleView = (productId: string) => {
-    navigate(`/product/${productId}`);
-  };
+  const handleAddNew = () => navigate('/admin/products/new');
+  const handleEdit = (productId: string) => navigate(`/admin/products/edit/${productId}`);
+  const handleView = (productId: string) => navigate(`/product/${productId}`);
 
   return (
     <AdminLayout>
       <div className="container py-10">
         <Card>
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-            <div>
-              <CardTitle className="text-2xl font-bold">Products</CardTitle>
-              <CardDescription>
-                Manage your product inventory
-              </CardDescription>
-            </div>
-            <Button onClick={handleAddNew}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Product
-            </Button>
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div><CardTitle className="text-2xl font-bold">Products</CardTitle><CardDescription>Manage product inventory</CardDescription></div>
+            <Button onClick={handleAddNew}><Plus className="mr-2 h-4 w-4" />Add Product</Button>
           </CardHeader>
           <CardContent>
-            <div className="mb-6 flex flex-col sm:flex-row gap-4">
-              <div className="relative w-full sm:w-96">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full sm:w-auto">
-                    <Filter className="mr-2 h-4 w-4" />
-                    Filter
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Filter by</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>In Stock</DropdownMenuItem>
-                  <DropdownMenuItem>Out of Stock</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>Categories</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>Electronics</DropdownMenuItem>
-                  <DropdownMenuItem>Clothing</DropdownMenuItem>
-                  <DropdownMenuItem>Home & Kitchen</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {isLoading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-              </div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No products found</p>
-              </div>
-            ) : (
+            <div className="mb-6"><Input placeholder="Search products..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} /></div>
+            {isLoading ? <div className="text-center py-8"><Loader2 className="h-8 w-8 animate-spin"/></div> : 
+             sortedAndFilteredProducts.length === 0 ? <p className="text-center py-4 text-muted-foreground">No products found.</p> : (
               <div className="rounded-md border">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">
-                        <span className="sr-only">Image</span>
-                      </TableHead>
-                      <TableHead>
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => handleSort('name')}
-                          className="flex items-center text-left font-medium"
-                        >
-                          Product Name
-                          {sortField === 'name' && (
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableHead>
-                      <TableHead>
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => handleSort('category')}
-                          className="flex items-center text-left font-medium"
-                        >
-                          Category
-                          {sortField === 'category' && (
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => handleSort('price')}
-                          className="flex items-center justify-end font-medium ml-auto"
-                        >
-                          Price
-                          {sortField === 'price' && (
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => handleSort('stock')}
-                          className="flex items-center justify-end font-medium ml-auto"
-                        >
-                          Stock
-                          {sortField === 'stock' && (
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProducts.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell>
-                          <div className="h-12 w-12 rounded-md border overflow-hidden">
-                            <img
-                              src={product.images[0] || '/placeholder.svg'}
-                              alt={product.name}
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell>{product.category}</TableCell>
-                        <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
-                        <TableCell className="text-right">{product.stock}</TableCell>
-                        <TableCell className="text-center">
-                          {product.stock > 0 ? (
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">In Stock</Badge>
-                          ) : (
-                            <Badge variant="secondary">Out of Stock</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleView(product.id)}
-                              title="View Product"
-                            >
-                              <Eye className="h-4 w-4" />
-                              <span className="sr-only">View</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(product.id)}
-                              title="Edit Product"
-                            >
-                              <Edit className="h-4 w-4" />
-                              <span className="sr-only">Edit</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-red-500"
-                              onClick={() => handleDeleteClick(product)}
-                              title="Delete Product"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Delete</span>
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                  <TableHeader><TableRow>
+                    <TableHead className="w-12"><span className="sr-only">Img</span></TableHead>
+                    <TableHead><Button variant="ghost" onClick={() => handleSort('name')}>Name {sortField === 'name' && <ArrowUpDown className="ml-1 h-3 w-3 inline"/>}</Button></TableHead>
+                    <TableHead><Button variant="ghost" onClick={() => handleSort('categoryName')}>Category {sortField === 'categoryName' && <ArrowUpDown className="ml-1 h-3 w-3 inline"/>}</Button></TableHead>
+                    <TableHead className="text-right"><Button variant="ghost" onClick={() => handleSort('price')}>Price {sortField === 'price' && <ArrowUpDown className="ml-1 h-3 w-3 inline"/>}</Button></TableHead>
+                    <TableHead className="text-right"><Button variant="ghost" onClick={() => handleSort('stock')}>Stock {sortField === 'stock' && <ArrowUpDown className="ml-1 h-3 w-3 inline"/>}</Button></TableHead>
+                    <TableHead className="text-center">Status</TableHead><TableHead className="text-right">Actions</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>{sortedAndFilteredProducts.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell><img src={p.images[0] || '/placeholder.svg'} alt={p.name} className="h-10 w-10 object-cover rounded"/></TableCell>
+                      <TableCell className="font-medium">{p.name}</TableCell>
+                      <TableCell>{p.categoryName || p.categoryId}</TableCell>
+                      <TableCell className="text-right">${p.price.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{p.stock}</TableCell>
+                      <TableCell className="text-center"><Badge variant={p.isEnabled ? (p.stock > 0 ? 'default' : 'destructive') : 'outline'}>{p.isEnabled ? (p.stock > 0 ? 'In Stock' : 'Out of Stock') : 'Disabled'}</Badge></TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleView(p.id)}><Eye size={16}/></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(p.id)}><Edit size={16}/></Button>
+                        <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDeleteClick(p)}><Trash2 size={16}/></Button>
+                      </TableCell>
+                    </TableRow>))}
                   </TableBody>
                 </Table>
-              </div>
-            )}
+              </div>)}
           </CardContent>
         </Card>
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Delete Product</DialogTitle><DialogDescription>Delete "{productToDelete?.name}"?</DialogDescription></DialogHeader>
+            <DialogFooter><Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button><Button variant="destructive" onClick={handleDeleteConfirm}>Delete</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-
-      {/* Delete confirmation dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Product</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex justify-between sm:justify-end">
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              <X className="mr-2 h-4 w-4" />
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteConfirm}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AdminLayout>
   );
 };
-
-export default AdminProducts; 
+export default AdminProducts;

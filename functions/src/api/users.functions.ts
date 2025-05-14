@@ -7,9 +7,11 @@ import {
   updateUserProfileBE,
   deleteUserProfileBE,
   updateUserRolesBE,
-  UserProfileCreationData, // Ensure this is exported from service if used directly here
+  getAllUserProfilesBE, // Added
+  UserProfileCreationData, 
   UserProfileUpdateData,
-  UserRole
+  UserRole,
+  GetAllUserProfilesOptionsBE // Added
 } from '../../../src/services/userService'; // Adjust path
 
 const ensureAuthenticated = (context: functions.https.CallableContext): string => {
@@ -37,13 +39,11 @@ export const onUserCreateAuthTriggerCF = functions.auth.user().onCreate(async (u
       displayName: user.displayName,
       photoURL: user.photoURL,
       phoneNumber: user.phoneNumber,
-      // roles will default to ['customer'] in upsertUserProfileBE
     };
     await upsertUserProfileBE(user.uid, profileData);
     console.log(`Firestore profile created/synced for new user: ${user.uid}`);
   } catch (error) {
     console.error(`Error in onUserCreateAuthTriggerCF for user ${user.uid}:`, error);
-    // Do not rethrow to prevent issues with Auth user creation flow.
   }
 });
 
@@ -63,11 +63,10 @@ export const getUserProfileCF = functions.https.onCall(async (data, context) => 
   try {
     const userProfile = await getUserProfileBE(userId);
     if (!userProfile) {
-      // Attempt to create if missing, e.g., for users created before trigger was active
       const authUser = context.auth?.token;
       if (authUser && authUser.email) {
           console.warn(`User profile for ${userId} not found. Attempting to create from Auth token.`);
-          const freshProfile = await upsertUserProfileBE(userId, {email: authUser.email, displayName: authUser.name, photoURL: authUser.picture});
+          const freshProfile = await upsertUserProfileBE(userId, {email: authUser.email!, displayName: authUser.name, photoURL: authUser.picture});
           return { success: true, profile: freshProfile };
       }
       throw new functions.https.HttpsError('not-found', 'User profile not found.');
@@ -80,6 +79,26 @@ export const getUserProfileCF = functions.https.onCall(async (data, context) => 
   }
 });
 
+export const getAllUserProfilesCF = functions.https.onCall(async (data: GetAllUserProfilesOptionsBE | undefined, context) => {
+    console.log("(Cloud Function) getAllUserProfilesCF called with data:", data);
+    ensureAdmin(context);
+    try {
+        const options: GetAllUserProfilesOptionsBE = {
+            limit: data?.limit || 25,
+            startAfter: data?.startAfter,
+            sortBy: data?.sortBy || 'createdAt',
+            sortOrder: data?.sortOrder || 'desc',
+            role: data?.role,
+        };
+        const result = await getAllUserProfilesBE(options);
+        return { success: true, ...result };
+    } catch (error: any) {
+        console.error("Error in getAllUserProfilesCF:", error);
+        if (error instanceof functions.https.HttpsError) throw error;
+        throw new functions.https.HttpsError('internal', error.message || 'Failed to get all user profiles.');
+    }
+});
+
 export const updateUserProfileCF = functions.https.onCall(async (data: UserProfileUpdateData, context) => {
   console.log("(Cloud Function) updateUserProfileCF called with data:", data);
   const userId = ensureAuthenticated(context);
@@ -87,7 +106,6 @@ export const updateUserProfileCF = functions.https.onCall(async (data: UserProfi
     if (Object.keys(data).length === 0) {
         throw new functions.https.HttpsError('invalid-argument', 'Update data cannot be empty.');
     }
-    // TODO: Add server-side validation for UserProfileUpdateData fields
     const updatedProfile = await updateUserProfileBE(userId, data);
     return { success: true, profile: updatedProfile };
   } catch (error: any) {
@@ -105,7 +123,6 @@ export const updateUserRolesCF = functions.https.onCall(async (data: { targetUse
     if (!targetUserId || !roles || !Array.isArray(roles)) {
       throw new functions.https.HttpsError('invalid-argument', 'Target User ID and roles array are required.');
     }
-    // TODO: Validate roles against allowed UserRole enum/type
     await updateUserRolesBE(targetUserId, roles);
     return { success: true, message: `Roles updated for user ${targetUserId}.` };
   } catch (error: any) {

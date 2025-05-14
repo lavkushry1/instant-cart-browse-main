@@ -6,34 +6,42 @@ This document outlines the current implementation status of features based on th
 
 ...
 
-## User-Facing E-commerce Flow
+## Admin Management Features
 
 ...
 
-### UPI QR Payment Flow
--   [✅] Dynamic QR Code Generation & Display (`UpiQRCode.tsx` component created)
--   [✅] Integration of `UpiQRCode.tsx` into Checkout Payment Step (`PaymentMethods.tsx` updated)
--   [✅] Payment Status Monitoring & UI Feedback Refinement (Simulated with distinct states, messages, and countdown in `PaymentMethods.tsx`)
--   [✅] 10-Minute Wait & Dummy Tracking Display Orchestration (10-min wait simulated in `PaymentMethods.tsx`; `Checkout.tsx` handles transition to success/tracking post-submission)
+### Core E-commerce Admin (Based on original detailed `requirements.md`)
+-   [🟢] **Product Management System** (Backend Service SDK Activated)
+    -   [🟡] **Frontend Admin UI** (`Admin/Products.tsx` & `Admin/ProductForm.tsx` - **Current Focus: Replace mock CF calls with live `httpsCallable`**)
+-   [🟢] **Category Management System** (Backend Service SDK Activated)
+    -   [✅] **Frontend Admin UI** (`Admin/Categories.tsx` structure for CF integration complete with mocks)
+-   [🟢] **Order Management System** (Backend Service SDK Activated)
+    -   [✅] **Frontend Admin UI** (`Admin/Orders.tsx` structure for CF integration complete with mocks)
+-   [🟢] **User Management System** (Backend Service SDK Activated, including Auth Triggers)
+    -   [✅] **Frontend Admin UI** (`Admin/Customers.tsx` structure for CF integration complete with mocks)
+-   [🟢] **Review Management System** (Backend Service SDK Activated)
+    -   [✅] **Frontend Admin UI** (`Admin/Reviews.tsx` for moderation, structure for CF integration complete with mocks)
+-   [🟢] **Admin General Settings** (`adminService.ts` - Backend SDK Activated)
+    -   [✅] Frontend Admin UI (`Admin/Settings.tsx` for general & UPI config, using live `httpsCallable` structure with mock fallback)
 
-### Credit Card Payment Flow
--   [✅] Card Details Collection Form (`CreditCardForm.tsx` - structure exists)
--   [✅] Client-Side Card Validation (Assumed within `CreditCardForm.tsx`)
--   [✅] ZIP Code Validation & Address Correction Workflow:
-    -   [🔲] Backend ZIP validation logic (if not purely client-side for demo)
-    -   [✅] Redirection to Address Correction Form (`AddressCorrection.tsx` - structure exists)
-    -   [✅] Card detail persistence & pre-fill after correction (`CreditCardForm.tsx` saves/loads from session storage; `PaymentMethods.tsx` manages prefill state; `Checkout.tsx` handles address update callback)
--   [✅] OTP Verification Step (Frontend UI in `CreditCardForm.tsx` - dummy OTP logic)
--   [✅] Transaction Pending Status & 10-Minute Countdown (`CreditCardForm.tsx` correctly handles internal wait before `onPaymentComplete`)
--   [✅] **Dummy Tracking Display Orchestration** (After 10-min wait - `Checkout.tsx` handles transition to success/tracking after `onPaymentComplete` is called by `CreditCardForm.tsx` - **Verified / No Change Needed**)
+...
 
+## Backend Implementation Status (Firebase)
 ...
 
 ## Next Steps & Priorities
 
-1.  **Frontend Implementation for Custom Payment Flows**: Completed for core UPI and Credit Card flows (pending real backend ZIP validation and more robust UPI status check if not simulated).
-2.  **Admin Payment Configuration UI**: Frontend for admin to set UPI ID (and fetch it in `PaymentMethods`). (**Current Focus**)
-3.  **Firebase Live Integration & Testing**: Deploy backend, test thoroughly, connect frontend.
-4.  **Complete Core Admin Panel UIs**.
-5.  **Comprehensive Testing**.
-6.  **Address UI/UX Refinements & Design Principles**.
+1.  **Frontend Implementation for Custom Payment Flows**: Core logic structured.
+2.  **Admin Payment Configuration UI**: Done (structurally, pending live CF calls verification).
+3.  **Firebase Client SDK Setup & Live Integration**: 
+    *   Ensure `src/lib/firebaseClient.ts` is correctly initialized. (User action)
+    *   Verify/update deployed Cloud Function names in frontend calls. (User action)
+    *   Update `PaymentMethods.tsx` & `useSiteSettings` hook for live CF calls.
+    *   **Replace mock CF calls in existing Admin UIs with live `httpsCallable` instances.** (**Current Focus: `Admin/Products.tsx` and `Admin/ProductForm.tsx`**)
+    *   Integrate other Admin Panel UIs (e.g., SEO, Theme) and core e-commerce flows (Order placement) to their respective live Cloud Functions.
+4.  **Firebase Live Testing**: Deploy backend, test thoroughly with live frontend calls.
+5.  **Complete Core Admin Panel UIs**.
+6.  **Comprehensive Testing**.
+7.  **Address UI/UX Refinements & Design Principles**.
+
+_Current Focus: Replacing mock Cloud Function calls with actual `httpsCallable` structures in Admin Product Management UIs (`Admin/Products.tsx`, `Admin/ProductForm.tsx`)._
