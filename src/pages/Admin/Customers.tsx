@@ -61,7 +61,7 @@ const AdminCustomers = () => {
       const result = await fn(options);
       if (result.data.success && result.data.profiles) setUsers(result.data.profiles);
       else { toast.error(result.data.error || 'Failed to load users'); setUsers([]); }
-    } catch (e:any) { toast.error(\`Failed to load users: ${e.message}\`); setUsers([]); }
+    } catch (e:any) { toast.error('Failed to load users: ' + e.message); setUsers([]); }
     setIsLoading(false);
   }, []);
 
@@ -88,7 +88,7 @@ const AdminCustomers = () => {
         fetchUsers(); 
         setIsRolesDialogOpen(false);
       } else { toast.error(result.data.error || "Failed to update roles."); }
-    } catch (e:any) { toast.error(\`Failed to update roles: ${e.message}\`); }
+    } catch (e:any) { toast.error('Failed to update roles: ' + e.message); }
     setIsSavingRoles(false);
   };
 

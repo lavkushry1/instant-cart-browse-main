@@ -68,7 +68,7 @@ const AdminReviews = () => {
       if (result.data.success && result.data.reviews) {
         setReviews(result.data.reviews);
       } else { toast.error(result.data.error || 'Failed to load reviews'); setReviews([]); }
-    } catch (e:any) { toast.error(\`Failed to load reviews: ${e.message}\`); setReviews([]); }
+    } catch (e:any) { toast.error('Failed to load reviews: ' + e.message); setReviews([]); }
     setIsLoading(false);
   }, [filterStatus]);
 
@@ -81,7 +81,7 @@ const AdminReviews = () => {
       const result = await fn({ productId: review.productId, reviewId: review.id, updateData: { approved: true } });
       if (result.data.success) { toast.success('Review approved!'); fetchReviews(); }
       else { toast.error(result.data.error || 'Failed to approve review.'); }
-    } catch (e:any) { toast.error(\`Error approving review: ${e.message}\`); }
+    } catch (e:any) { toast.error('Error approving review: ' + e.message); }
     setIsProcessingAction(false);
   };
 
@@ -93,7 +93,7 @@ const AdminReviews = () => {
       const result = await fn({ productId: reviewToDelete.productId, reviewId: reviewToDelete.id });
       if (result.data.success) { toast.success('Review deleted/rejected!'); fetchReviews(); }
       else { toast.error(result.data.error || 'Failed to delete review.'); }
-    } catch (e:any) { toast.error(\`Error deleting review: ${e.message}\`); }
+    } catch (e:any) { toast.error('Error deleting review: ' + e.message); }
     setReviewToDelete(null);
     setIsProcessingAction(false);
   };

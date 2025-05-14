@@ -1,165 +1,163 @@
 // src/components/checkout/OrderTracking.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Order, OrderStatus } from '@/services/orderService'; // Assuming Order type is available
-import { Loader2, AlertCircle, Package, Truck, Home, CheckCircle } from 'lucide-react';
-
-// Firebase Client SDK imports
-import { functionsClient } from '@/lib/firebaseClient';
-import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions';
-
-let getOrderByIdCF: HttpsCallable<{ orderId: string }, HttpsCallableResult<{ success: boolean; order?: Order; error?: string }>> | undefined;
-
-if (functionsClient && Object.keys(functionsClient).length > 0) {
-  try {
-    // Ensure this callable function name matches your deployed Cloud Function
-    getOrderByIdCF = httpsCallable(functionsClient, 'orders-getOrderByIdCF');
-    console.log("OrderTracking: Live httpsCallable for getOrderByIdCF created.");
-  } catch (error) {
-    console.error("OrderTracking: Error preparing getOrderByIdCF httpsCallable:", error);
-  }
-} else {
-    console.warn("OrderTracking: Firebase functions client not available. Order details will be mocked or fail.");
-}
-
-// Fallback mock
-const fallbackGetOrderById = async (orderId: string): Promise<HttpsCallableResult<{success: boolean; order?: Order; error?: string}>> => {
-    console.warn(`MOCK getOrderByIdCF for ${orderId}`);
-    await new Promise(r => setTimeout(r, 500));
-    if (orderId.startsWith("ORD")) { // Simulate finding an order
-        return { data: { success: true, order: { 
-            id: orderId, 
-            orderStatus: 'Shipped', 
-            // Add other necessary mock Order fields for display
-            customerEmail: 'mock@example.com',
-            shippingAddress: {firstName: 'Mock', lastName:'User', address:'123 Mock St', city:'Mockville', state:'MS', zipCode:'00000', email:'', phone:''},
-            items: [{productId:'p1', productName:'Mock Item', quantity:1, unitPrice:10, finalUnitPrice:10, lineItemTotal:10}],
-            subtotal:10, cartDiscountAmount:0, shippingCost:5, taxAmount:1, grandTotal:16,
-            paymentMethod: 'card', paymentStatus: 'Paid',
-            createdAt: new Date().toISOString(), 
-            updatedAt: new Date().toISOString() 
-        } as unknown as Order } };
-    }
-    return { data: { success: false, error: "Mock: Order not found" } };
-};
+import { Order, OrderStatus } from '@/services/orderService';
+import { Loader2, AlertCircle, Package, Truck, Home, CheckCircle, MapPin, CalendarDays } from 'lucide-react';
 
 interface OrderTrackingProps {
-  orderId: string | null; // Can be null initially
+  orderDetails: Order | null;
 }
 
-const trackingStatuses: { id: OrderStatus; label: string; description: string; icon: React.ElementType }[] = [
-  { id: 'Pending', label: 'Order Placed', description: 'Your order has been received.', icon: Package },
-  { id: 'Processing', label: 'Processing', description: "We're preparing your order.", icon: Loader2 }, // Loader2 might need animate-spin
-  { id: 'Shipped', label: 'Shipped', description: 'Your order is on its way.', icon: Truck },
-  // { id: 'OutForDelivery', label: 'Out for Delivery', description: 'Arriving soon!', icon: Truck }, // Consider if this is a distinct status from BE
-  { id: 'Delivered', label: 'Delivered', description: 'Your order has arrived!', icon: Home },
-  { id: 'Cancelled', label: 'Cancelled', description: 'Your order has been cancelled.', icon: AlertCircle },
-  { id: 'PaymentFailed', label: 'Payment Failed', description: 'There was an issue with your payment.', icon: AlertCircle },
-  // Add other statuses like Refunded if needed
+const trackingStatuses: { id: OrderStatus | string; label: string; description: string; icon: React.ElementType }[] = [
+  { id: 'Pending', label: 'Order Placed', description: 'Received and awaiting processing.', icon: Package },
+  { id: 'Processing', label: 'Processing', description: "Preparing your order for shipment.", icon: Loader2 },
+  { id: 'Shipped', label: 'Shipped', description: 'On its way to you.', icon: Truck },
+  { id: 'Delivered', label: 'Delivered', description: 'Successfully delivered!', icon: Home },
+  { id: 'Cancelled', label: 'Order Cancelled', description: 'This order has been cancelled.', icon: AlertCircle },
+  { id: 'PaymentFailed', label: 'Payment Failed', description: 'Payment issue with this order.', icon: AlertCircle },
+  { id: 'Refunded', label: 'Order Refunded', description: 'This order has been refunded.', icon: AlertCircle },
 ];
 
-const OrderTracking = ({ orderId }: OrderTrackingProps) => {
-  const [order, setOrder] = useState<Order | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [estimatedDelivery, setEstimatedDelivery] = useState<string>('');
+interface ShipmentHistoryEvent {
+  timestamp: Date;
+  status: string;
+  location: string;
+  description: string;
+}
 
-  const fetchOrderDetails = useCallback(async (id: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const fn = getOrderByIdCF || (() => fallbackGetOrderById(id));
-      const result = await fn({ orderId: id });
-      if (result.data.success && result.data.order) {
-        setOrder(result.data.order);
-        // Mock estimated delivery based on order creation or shipped date
-        const createDate = new Date(result.data.order.createdAt?.toDate ? result.data.order.createdAt.toDate() : result.data.order.createdAt);
-        const delivery = new Date(createDate);
-        delivery.setDate(createDate.getDate() + (result.data.order.orderStatus === 'Shipped' || result.data.order.orderStatus === 'Delivered' ? 3 : 5));
-        setEstimatedDelivery(delivery.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
-      } else {
-        setError(result.data.error || 'Order not found or could not be loaded.');
-        setOrder(null);
-      }
-    } catch (e: any) {
-      setError(e.message || 'Failed to fetch order details.');
-      console.error("Error fetching order details:", e);
-      setOrder(null);
-    }
-    setIsLoading(false);
-  }, []);
+const generateMockShipmentHistory = (order: Order): ShipmentHistoryEvent[] => {
+  if (!order || !order.createdAt) return [];
+  const history: ShipmentHistoryEvent[] = [];
+  const orderDate = typeof order.createdAt === 'string' ? new Date(order.createdAt) : order.createdAt.toDate ? order.createdAt.toDate() : new Date();
+
+  history.push({ timestamp: orderDate, status: "Order Placed", location: "Warehouse, Origin City", description: "Order confirmation received." });
+
+  if (order.orderStatus === 'Processing' || order.orderStatus === 'Shipped' || order.orderStatus === 'Delivered') {
+    const processingDate = new Date(orderDate);
+    processingDate.setHours(orderDate.getHours() + 2); // 2 hours later
+    history.push({ timestamp: processingDate, status: "Processing", location: "Warehouse, Origin City", description: "Items picked and packed." });
+  }
+  if (order.orderStatus === 'Shipped' || order.orderStatus === 'Delivered') {
+    const shippedDate = new Date(orderDate);
+    shippedDate.setDate(orderDate.getDate() + 1); // 1 day later
+    shippedDate.setHours(9);
+    history.push({ 
+        timestamp: shippedDate, 
+        status: "Shipped", 
+        location: "Origin Hub, Origin City", 
+        description: `Package dispatched. Carrier: ${order.shippingCarrier || 'DemoTrans'}, Tracking: ${order.trackingNumber || 'NA'}` 
+    });
+    const transitDate = new Date(shippedDate);
+    transitDate.setDate(shippedDate.getDate() + 1); // Next day
+    transitDate.setHours(14);
+    history.push({ timestamp: transitDate, status: "In Transit", location: "Destination Hub, Destination City", description: "Arrived at sort facility near you." });
+  }
+  if (order.orderStatus === 'Delivered') {
+    const deliveredDate = new Date(orderDate);
+    deliveredDate.setDate(orderDate.getDate() + (order.shippingCarrier === 'Express' ? 2 : 3)); // 2-3 days later
+    deliveredDate.setHours(11);
+    history.push({ timestamp: deliveredDate, status: "Delivered", location: `${order.shippingAddress.city}, ${order.shippingAddress.state}`, description: "Package delivered successfully." });
+  }
+  return history.sort((a,b) => b.timestamp.getTime() - a.timestamp.getTime()); // Show newest first
+};
+
+const OrderTracking: React.FC<OrderTrackingProps> = ({ orderDetails }) => {
+  const [estimatedDelivery, setEstimatedDelivery] = useState<string>('');
+  const [shipmentHistory, setShipmentHistory] = useState<ShipmentHistoryEvent[]>([]);
 
   useEffect(() => {
-    if (orderId) {
-      fetchOrderDetails(orderId);
-    } else {
-      setIsLoading(false);
-      setError("No order ID provided for tracking.");
+    if (orderDetails) {
+      const createDate = typeof orderDetails.createdAt === 'string' 
+        ? new Date(orderDetails.createdAt) 
+        : orderDetails.createdAt.toDate ? orderDetails.createdAt.toDate() : new Date();
+      const delivery = new Date(createDate);
+      let deliveryDays = 5;
+      if (orderDetails.orderStatus === 'Shipped') deliveryDays = 3;
+      if (orderDetails.orderStatus === 'Delivered') deliveryDays = 0;
+      delivery.setDate(createDate.getDate() + deliveryDays);
+      setEstimatedDelivery(delivery.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }));
+      setShipmentHistory(generateMockShipmentHistory(orderDetails));
     }
-  }, [orderId, fetchOrderDetails]);
+  }, [orderDetails]);
 
-  if (isLoading) return <div className="p-6 text-center"><Loader2 className="h-8 w-8 animate-spin"/> Loading order tracking...</div>;
-  if (error) return <div className="p-6 text-center text-red-500"><AlertCircle className="inline mr-2"/>{error}</div>;
-  if (!order) return <div className="p-6 text-center text-muted-foreground">Order details not available.</div>;
+  if (!orderDetails) return <Card className="w-full max-w-2xl mx-auto"><CardHeader><CardTitle>Order Tracking</CardTitle></CardHeader><CardContent><p>No order details.</p></CardContent></Card>;
 
-  const currentStatusIndex = trackingStatuses.findIndex(s => s.id === order.orderStatus);
-  const progressPercentage = currentStatusIndex >=0 ? ((currentStatusIndex + 1) / trackingStatuses.filter(s => !['Cancelled', 'PaymentFailed'].includes(s.id)).length) * 100 : 0;
+  const order = orderDetails;
+  const linearStatuses = trackingStatuses.filter(s => !['Cancelled', 'PaymentFailed', 'Refunded'].includes(s.id));
+  const currentStatusIdx = linearStatuses.findIndex(s => s.id === order.orderStatus);
+  const isNonLinear = ['Cancelled', 'PaymentFailed', 'Refunded'].includes(order.orderStatus);
+  const progress = isNonLinear ? 100 : currentStatusIdx !== -1 ? ((currentStatusIdx + 1) / linearStatuses.length) * 100 : 0;
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-2xl mx-auto mt-6 mb-6">
       <CardHeader>
-        <CardTitle className="text-xl md:text-2xl">Order Tracking</CardTitle>
-        <CardDescription>Order ID: <span className="font-mono">{order.id}</span></CardDescription>
+        <CardTitle className="text-xl md:text-2xl">Track Your Order: #{order.id.substring(0, 12)}...</CardTitle>
+        <CardDescription>
+          Current Status: <span className="font-semibold text-blue-600">{order.orderStatus}</span>
+          {!isNonLinear && order.orderStatus !== 'Delivered' && estimatedDelivery && ` - Est. Delivery: ${estimatedDelivery}`}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <p className="text-sm font-medium">Status: <span className="text-blue-600 font-semibold">{order.orderStatus}</span></p>
-            {order.orderStatus !== 'Delivered' && order.orderStatus !== 'Cancelled' && order.orderStatus !== 'PaymentFailed' && estimatedDelivery && (
-              <p className="text-sm text-muted-foreground">Est. Delivery: {estimatedDelivery}</p>
-            )}
-          </div>
-          <Progress value={progressPercentage} className="h-2" />
-        </div>
-
-        <div className="space-y-4">
-          {trackingStatuses.map((status, index) => {
-            const isActive = status.id === order.orderStatus;
-            const isCompleted = currentStatusIndex >= index && !['Cancelled', 'PaymentFailed'].includes(status.id) && order.orderStatus !== 'Cancelled' && order.orderStatus !== 'PaymentFailed';
-            const Icon = status.icon;
-
-            if (['Cancelled', 'PaymentFailed'].includes(order.orderStatus) && order.orderStatus !== status.id) {
-                return null; // Don't show other statuses if order is cancelled or payment failed, only the final one.
-            }
+      <CardContent className="space-y-8">
+        <Progress value={progress} className="h-2" />
+        <div className="space-y-5">
+          {trackingStatuses.map((statusInfo, index) => {
+            const isCurrent = statusInfo.id === order.orderStatus;
+            const isCompleted = !isNonLinear && currentStatusIdx > linearStatuses.findIndex(s => s.id === statusInfo.id);
+            const Icon = statusInfo.icon;
+            if (isNonLinear && statusInfo.id !== order.orderStatus) return null;
+            if (!isNonLinear && linearStatuses.findIndex(s => s.id === statusInfo.id) === -1) return null; // only show linear path
 
             return (
-              <div key={status.id} className={`flex items-start space-x-3 p-3 rounded-md ${
-                isActive ? 'bg-blue-50 border border-blue-200' : ''
+              <div key={statusInfo.id} className={`flex items-start space-x-4 p-3 rounded-md ${
+                isCurrent ? 'bg-blue-50 border-l-4 border-blue-500' : isCompleted ? 'opacity-60' : 'opacity-40' 
               }`}>
-                <div className={`mt-1 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  isCompleted ? 'bg-green-500 text-white' : isActive ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-400'
+                <div className={`mt-1 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white ${
+                  isCompleted ? 'bg-green-500' : isCurrent ? 'bg-blue-500' : 'bg-gray-400'
                 }`}>
-                  {isCompleted && status.id !== order.orderStatus ? <CheckCircle size={16}/> : <Icon size={16} className={isActive && status.id === 'Processing' ? 'animate-spin' : ''}/>}
+                  {isCompleted ? <CheckCircle size={20}/> : <Icon size={18} className={isCurrent && statusInfo.id === 'Processing' ? 'animate-spin' : ''}/>}
                 </div>
                 <div>
-                  <div className={`font-medium ${isActive ? 'text-blue-700' : isCompleted ? 'text-green-700' : 'text-gray-600'}`}>{status.label}</div>
-                  <p className="text-sm text-muted-foreground">{status.description}</p>
-                  {status.id === 'Shipped' && (order.trackingNumber || order.shippingCarrier) && (isActive || isCompleted) && (
-                    <p className="text-xs mt-1 text-gray-500">
-                      {order.shippingCarrier && <span>Carrier: {order.shippingCarrier} | </span>}
-                      {order.trackingNumber && <span>Tracking: {order.trackingNumber}</span>}
-                    </p>
-                  )}
+                  <div className={`font-semibold ${isCurrent ? 'text-blue-700' : isCompleted ? 'text-green-700' : 'text-gray-800'}`}>{statusInfo.label}</div>
+                  <p className="text-sm text-gray-600">{statusInfo.description}</p>
                 </div>
               </div>
             );
           })}
         </div>
-        {/* Can add more details like items summary here if needed */}
+        {shipmentHistory.length > 0 && (
+          <div className="mt-8 pt-6 border-t">
+            <h4 className="text-lg font-semibold mb-4">Shipment History</h4>
+            <ul className="space-y-4">
+              {shipmentHistory.map((event, idx) => (
+                <li key={idx} className="relative pl-8 border-l border-gray-200 hover:bg-gray-50 py-2 pr-2">
+                  <div className="absolute -left-[9px] top-1.5 w-4 h-4 bg-blue-500 rounded-full border-2 border-white"></div>
+                  <p className="text-xs text-gray-400 flex items-center"><CalendarDays size={14} className="mr-1.5"/>{event.timestamp.toLocaleString(undefined, {dateStyle: 'medium', timeStyle: 'short'})}</p>
+                  <p className="font-medium text-sm text-gray-700">{event.status}</p>
+                  <p className="text-xs text-gray-500 flex items-center"><MapPin size={14} className="mr-1.5"/>{event.location}</p>
+                  {event.description && <p className="text-xs text-gray-500 mt-0.5">{event.description}</p>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {order.items && order.items.length > 0 && (
+            <div className="mt-6 pt-4 border-t">
+                <h4 className="text-md font-semibold mb-3">Order Items Summary</h4>
+                <ul className="space-y-1 text-sm">
+                    {order.items.map((item, idx) => (
+                        <li key={`${item.productId}-${idx}`} className="flex justify-between">
+                            <span>{item.productName} (x{item.quantity})</span>
+                            <span>₹{item.lineItemTotal.toFixed(2)}</span>
+                        </li> ))}
+                </ul>
+                <div className="flex justify-between font-bold mt-2 pt-2 border-t">
+                    <span>Grand Total:</span><span>₹{order.grandTotal.toFixed(2)}</span>
+                </div>
+            </div>
+        )}
       </CardContent>
     </Card>
   );
 };
-
 export default OrderTracking;

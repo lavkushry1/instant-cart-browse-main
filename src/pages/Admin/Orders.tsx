@@ -74,13 +74,13 @@ const AdminOrders = () => {
       const result = await fn(options);
       if (result.data.success && result.data.orders) setOrders(result.data.orders);
       else { toast.error(result.data.error || 'Failed to load orders'); setOrders([]); }
-    } catch (e:any) { toast.error(\`Failed to load orders: ${e.message}\`); setOrders([]); }
+    } catch (e:any) { toast.error('Failed to load orders: ' + e.message); setOrders([]); }
     setIsLoading(false);
   }, [statusFilter]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
-  const processedOrders = useMemo(() => { /* ... client side search/sort for now ... */ return orders; }, [orders, searchQuery /*, sortField, sortDirection*/]);
+  const processedOrders = useMemo(() => { /* ... client side search/sort for now ... */ return orders; }, [orders /*, sortField, sortDirection*/]);
 
   const handleDeleteConfirm = async () => {
     if (!orderToDelete) return;
@@ -89,7 +89,7 @@ const AdminOrders = () => {
       const result = await fn({ orderId: orderToDelete.id });
       if (result.data.success) { toast.success('Order deleted!'); fetchOrders(); }
       else toast.error(result.data.error || 'Delete failed.');
-    } catch (e:any) { toast.error(\`Delete error: ${e.message}\`); }
+    } catch (e:any) { toast.error('Delete error: ' + e.message); }
     setDialogsOpen(prev => ({...prev, delete: false})); setOrderToDelete(null);
   };
 
@@ -98,9 +98,9 @@ const AdminOrders = () => {
     const fn = updateOrderStatusAdminCF || (() => fallbackOrderCall('updateOrderStatusCF', { orderId: orderToUpdate!.id, newStatus }));
     try {
       const result = await fn({ orderId: orderToUpdate!.id, newStatus });
-      if (result.data.success) { toast.success(\`Status updated to ${newStatus}\`); fetchOrders(); }
+      if (result.data.success) { toast.success('Status updated to ' + newStatus); fetchOrders(); }
       else toast.error(result.data.error || 'Update failed.');
-    } catch (e:any) { toast.error(\`Update error: ${e.message}\`); }
+    } catch (e:any) { toast.error('Update error: ' + e.message); }
     setDialogsOpen(prev => ({...prev, statusUpdate: false})); setOrderToUpdate(null);
   };
 

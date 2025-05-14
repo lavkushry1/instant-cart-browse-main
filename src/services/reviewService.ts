@@ -109,7 +109,7 @@ export interface GetReviewsAdminOptionsBE {
 
 // New function for Admin to get reviews with more filters
 export const getReviewsAdminBE = async (options: GetReviewsAdminOptionsBE = {}): Promise<{ reviews: ProductReviewBE[], lastVisible?: any, totalCount?: number}> => {
-    console.log(\`(Service-Backend) getReviewsAdminBE with options:\`, options);
+    console.log('(Service-Backend) getReviewsAdminBE with options:', options);
     try {
         // This query needs to be on the root 'reviews' collection if not per product, 
         // or use collectionGroup query if reviews are subcollections and you want to query across all products.

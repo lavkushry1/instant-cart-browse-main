@@ -99,7 +99,7 @@ export const getOrdersBE = async (options: GetOrdersOptionsBE = {}): Promise<{ o
     const sortOrder = options.sortOrder || 'desc';
     query = query.orderBy(sortBy, sortOrder);
 
-    let totalCount: number | undefined = undefined;
+    const totalCount: number | undefined = undefined;
     // If using Firestore .count() - ensure your admin SDK version supports it.
     // const countQuery = query; // query without pagination for total count
     // try {

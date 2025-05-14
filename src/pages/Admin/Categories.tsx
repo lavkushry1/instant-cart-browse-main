@@ -13,6 +13,8 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea'; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+// Import Table components
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 import { functionsClient } from '@/lib/firebaseClient';
 import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions';
@@ -113,7 +115,7 @@ const AdminCategories = () => {
       const result = await fn();
       if (result.data.success && result.data.categories) setCategories(result.data.categories);
       else { toast.error(result.data.error || 'Failed to load categories'); setCategories([]); }
-    } catch (e:any) { toast.error(\`Failed to load categories: ${e.message}\`); setCategories([]); }
+    } catch (e:any) { toast.error('Failed to load categories: ' + e.message); setCategories([]); }
     setIsLoading(false);
   }, []);
 
@@ -133,7 +135,7 @@ const AdminCategories = () => {
         toast.success(`Category ${categoryIdToUpdate ? 'updated' : 'created'}!`);
         setIsFormOpen(false); setEditingCategory(null); fetchCategories();
       } else { toast.error(result.data.error || 'Save failed.'); }
-    } catch (e:any) { toast.error(\`Save error: ${e.message}\`); }
+    } catch (e:any) { toast.error('Save error: ' + e.message); }
   };
 
   const handleDeleteCategory = async () => {
@@ -143,7 +145,7 @@ const AdminCategories = () => {
       if (result.data.success) {
         toast.success('Category deleted!'); fetchCategories();
       } else { toast.error(result.data.error || 'Delete failed.'); }
-    } catch (e:any) { toast.error(\`Delete error: ${e.message}\`); }
+    } catch (e:any) { toast.error('Delete error: ' + e.message); }
     setCategoryToDelete(null);
   };
 

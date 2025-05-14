@@ -1,114 +1,79 @@
+// src/components/checkout/OrderSuccess.tsx
+import React from 'react'; // Added React import
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Check } from "lucide-react";
+import { Order } from '@/services/orderService'; // Import the main Order type
+import { DeliveryDetailsType } from '@/pages/Checkout'; // Import DeliveryDetailsType
 
 interface OrderSuccessProps {
-  orderDetails: {
-    id: string;
-    date: string;
-    email: string;
-    total: number;
-    paymentMethod: 'upi' | 'card' | 'apple-pay';
-  };
-  deliveryDetails: {
-    firstName: string;
-    lastName: string;
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
+  // orderDetails is now the full Order object (or relevant parts from it)
+  orderDetails: Pick<Order, 'id' | 'customerEmail' | 'grandTotal' | 'paymentMethod' | 'createdAt'>; // Example subset
+  // Or pass the full Order object: orderDetails: Order;
+  deliveryDetails: DeliveryDetailsType;
 }
 
-const OrderSuccess = ({ orderDetails, deliveryDetails }: OrderSuccessProps) => {
+// Helper to format date from various possible Timestamp/string formats
+const formatDateForDisplay = (dateInput: any) => {
+  if (!dateInput) return 'N/A';
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : 
+               dateInput.toDate ? dateInput.toDate() : 
+               dateInput instanceof Date ? dateInput : new Date(dateInput);
+  return date.toLocaleDateString('en-IN', { 
+    year: 'numeric', month: 'short', day: 'numeric', 
+    hour: '2-digit', minute: '2-digit' 
+  });
+};
+
+const OrderSuccess: React.FC<OrderSuccessProps> = ({ orderDetails, deliveryDetails }) => {
   const navigate = useNavigate();
   
-  // Estimate delivery date (5 days from now)
   const estimatedDelivery = new Date();
   estimatedDelivery.setDate(estimatedDelivery.getDate() + 5);
-  const deliveryDate = estimatedDelivery.toLocaleDateString('en-IN', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+  const deliveryDateStr = estimatedDelivery.toLocaleDateString('en-IN', { 
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
   });
   
   return (
-    <div className="bg-white p-8 rounded-lg shadow-sm text-center">
-      <div className="w-16 h-16 bg-green-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-        <Check className="w-8 h-8 text-green-600" />
+    <div className="bg-white p-6 md:p-8 rounded-lg shadow-lg text-center">
+      <div className="w-16 h-16 bg-green-100 rounded-full mx-auto mb-6 flex items-center justify-center">
+        <Check className="w-10 h-10 text-green-600" />
       </div>
       
-      <h2 className="text-2xl font-bold mb-2">Thank You for Your Order!</h2>
-      <p className="text-gray-600 mb-8">
-        Your order has been placed and is being processed.
+      <h2 className="text-2xl md:text-3xl font-bold mb-3">Thank You for Your Order!</h2>
+      <p className="text-gray-600 mb-8 max-w-md mx-auto">
+        Your order <span className="font-semibold text-gray-700">#{orderDetails.id.substring(0,12)}...</span> has been placed and is being processed.
       </p>
       
-      <div className="bg-gray-50 p-6 rounded-lg mb-6 text-left">
-        <h3 className="font-semibold text-lg mb-4">Order Details</h3>
-        
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-gray-500">Order Number</p>
-            <p className="font-medium">{orderDetails.id}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Order Date</p>
-            <p className="font-medium">{orderDetails.date}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Email</p>
-            <p className="font-medium">{orderDetails.email}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Payment Method</p>
-            <p className="font-medium">
-              {orderDetails.paymentMethod === 'upi' 
-                ? 'UPI Payment' 
-                : orderDetails.paymentMethod === 'apple-pay'
-                  ? 'Apple Pay'
-                  : 'Credit/Debit Card'
-              }
-            </p>
-          </div>
-          <div>
-            <p className="text-gray-500">Total Amount</p>
-            <p className="font-medium">₹{orderDetails.total.toFixed(2)}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Estimated Delivery</p>
-            <p className="font-medium">{deliveryDate}</p>
-          </div>
+      <div className="bg-gray-50 p-6 rounded-lg mb-6 text-left shadow-inner">
+        <h3 className="font-semibold text-lg mb-4 border-b pb-3">Order Summary</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+          <div><p className="text-gray-500">Order Number</p><p className="font-medium truncate">{orderDetails.id}</p></div>
+          <div><p className="text-gray-500">Order Date</p><p className="font-medium">{formatDateForDisplay(orderDetails.createdAt)}</p></div>
+          <div><p className="text-gray-500">Email</p><p className="font-medium truncate">{orderDetails.customerEmail}</p></div>
+          <div><p className="text-gray-500">Payment Method</p><p className="font-medium capitalize">{orderDetails.paymentMethod.replace('-',' ')}</p></div>
+          <div><p className="text-gray-500">Total Amount</p><p className="font-medium">₹{orderDetails.grandTotal.toFixed(2)}</p></div>
+          <div><p className="text-gray-500">Estimated Delivery</p><p className="font-medium">{deliveryDateStr}</p></div>
         </div>
         
-        <hr className="my-4" />
+        <hr className="my-6" />
         
-        <h4 className="font-medium mb-2">Shipping Address</h4>
-        <p>
+        <h4 className="font-semibold text-md mb-2">Shipping Address</h4>
+        <address className="text-sm not-italic">
           {deliveryDetails.firstName} {deliveryDetails.lastName}<br />
           {deliveryDetails.address}<br />
           {deliveryDetails.city}, {deliveryDetails.state} {deliveryDetails.zipCode}
-        </p>
+        </address>
       </div>
       
-      <p className="text-sm text-gray-500 mb-6">
-        We've sent a confirmation email to {orderDetails.email}.<br />
-        You'll receive updates as your order is processed.
+      <p className="text-sm text-gray-500 mb-8">
+        We've sent a confirmation email to {orderDetails.customerEmail}.<br />
+        You will receive further updates as your order progresses.
       </p>
       
-      <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4 justify-center">
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/')}
-        >
-          Continue Shopping
-        </Button>
-        <Button 
-          className="bg-brand-teal hover:bg-brand-dark"
-          onClick={() => navigate('/products')}
-        >
-          Browse More Products
-        </Button>
+      <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-4 justify-center">
+        <Button variant="outline" onClick={() => navigate('/')}>Continue Shopping</Button>
+        {/* <Button className="bg-brand-teal hover:bg-brand-dark" onClick={() => navigate('/account/orders')}>View My Orders</Button> */}
       </div>
     </div>
   );
