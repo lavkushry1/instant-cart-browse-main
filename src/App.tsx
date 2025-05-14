@@ -7,6 +7,7 @@ import { AuthProvider } from "./hooks/useAuth";
 import { ThemeProvider } from "./hooks/useTheme";
 import { ConsentProvider } from "./hooks/useConsent";
 import { CurrencyProvider } from "./hooks/useCurrency";
+import { OfferProvider } from "./contexts/OfferContext"; // Import OfferProvider
 import TrackingScriptManager from "./components/tracking/TrackingScriptManager";
 import ConsentBanner from "./components/tracking/ConsentBanner";
 import Home from "./pages/Home";
@@ -22,6 +23,7 @@ import AdminProducts from "./pages/Admin/Products";
 import ProductForm from "./pages/Admin/ProductForm";
 import AdminOrders from "./pages/Admin/Orders";
 import AdminDashboard from "./pages/Admin/Dashboard";
+import AdminOffersPage from "./pages/Admin/Offers"; // Import AdminOffersPage
 import SEOSettings from "./pages/Admin/SEOSettings";
 import ThemeSettings from "./pages/Admin/ThemeSettings";
 import TrackingSettings from "./pages/Admin/TrackingSettings";
@@ -49,41 +51,44 @@ const App = () => (
           <ThemeProvider>
             <ConsentProvider>
               <CurrencyProvider>
-                <TrackingScriptManager />
-                <ConsentBanner />
-                <Suspense fallback={<LoadingFallback />}>
-                  <Routes>
-                    {/* Customer Routes */}
-                    <Route path="/" element={<Home />} />
-                    <Route path="/products" element={<Products />} />
-                    <Route path="/products/:category" element={<Products />} />
-                    <Route path="/product/:productId" element={<ProductDetail />} />
-                    <Route path="/cart" element={<Cart />} />
-                    <Route path="/checkout" element={<Checkout />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
-                    <Route path="/account" element={<Account />} />
-                    <Route path="/deals" element={<Products />} />
-                    
-                    {/* Admin Routes */}
-                    <Route path="/admin" element={<AdminDashboard />} />
-                    <Route path="/admin/products" element={<AdminProducts />} />
-                    <Route path="/admin/products/new" element={<ProductForm />} />
-                    <Route path="/admin/products/edit/:productId" element={<ProductForm />} />
-                    <Route path="/admin/orders" element={<AdminOrders />} />
-                    <Route path="/admin/customers" element={<AdminCustomers />} />
-                    <Route path="/admin/analytics" element={<AdminAnalytics />} />
-                    <Route path="/admin/advanced-analytics" element={<AdvancedAnalytics />} />
-                    <Route path="/admin/currency" element={<CurrencySettings />} />
-                    <Route path="/admin/seo" element={<SEOSettings />} />
-                    <Route path="/admin/theme" element={<ThemeSettings />} />
-                    <Route path="/admin/tracking" element={<TrackingSettings />} />
-                    <Route path="/admin/settings" element={<AdminSettings />} />
-                    
-                    {/* Not Found */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
+                <OfferProvider> {/* Wrap with OfferProvider */}
+                  <TrackingScriptManager />
+                  <ConsentBanner />
+                  <Suspense fallback={<LoadingFallback />}>
+                    <Routes>
+                      {/* Customer Routes */}
+                      <Route path="/" element={<Home />} />
+                      <Route path="/products" element={<Products />} />
+                      <Route path="/products/:category" element={<Products />} />
+                      <Route path="/product/:productId" element={<ProductDetail />} />
+                      <Route path="/cart" element={<Cart />} />
+                      <Route path="/checkout" element={<Checkout />} />
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/register" element={<Register />} />
+                      <Route path="/account" element={<Account />} />
+                      <Route path="/deals" element={<Products />} />
+                      
+                      {/* Admin Routes */}
+                      <Route path="/admin" element={<AdminDashboard />} />
+                      <Route path="/admin/products" element={<AdminProducts />} />
+                      <Route path="/admin/products/new" element={<ProductForm />} />
+                      <Route path="/admin/products/edit/:productId" element={<ProductForm />} />
+                      <Route path="/admin/orders" element={<AdminOrders />} />
+                      <Route path="/admin/offers" element={<AdminOffersPage />} /> {/* Add route for AdminOffersPage */}
+                      <Route path="/admin/customers" element={<AdminCustomers />} />
+                      <Route path="/admin/analytics" element={<AdminAnalytics />} />
+                      <Route path="/admin/advanced-analytics" element={<AdvancedAnalytics />} />
+                      <Route path="/admin/currency" element={<CurrencySettings />} />
+                      <Route path="/admin/seo" element={<SEOSettings />} />
+                      <Route path="/admin/theme" element={<ThemeSettings />} />
+                      <Route path="/admin/tracking" element={<TrackingSettings />} />
+                      <Route path="/admin/settings" element={<AdminSettings />} />
+                      
+                      {/* Not Found */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
+                </OfferProvider>
               </CurrencyProvider>
             </ConsentProvider>
           </ThemeProvider>
