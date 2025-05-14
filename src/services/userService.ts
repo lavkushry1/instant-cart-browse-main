@@ -1,352 +1,152 @@
-import { toast } from "react-hot-toast";
+// src/services/userService.ts
 
-// Types
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  phone?: string;
-  address?: {
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-  };
-  createdAt: string;
+// Import Firebase Admin resources
+import {
+  db, // Firestore instance from firebaseAdmin.ts
+  auth, // Auth instance from firebaseAdmin.ts
+  adminInstance // For FieldValue, Timestamp etc. from firebaseAdmin.ts
+} from '../../lib/firebaseAdmin'; // Adjust path as necessary
+const USERS_COLLECTION = 'users';
+
+export interface UserProfileAddress {
+    street: string; city: string; state: string; zipCode: string; country: string; isDefault?: boolean;
 }
-
-export interface LoginCredentials {
-  email: string;
-  password: string;
+export type UserRole = 'customer' | 'admin' | 'editor';
+export interface UserProfile {
+  id: string; email: string; displayName?: string; firstName?: string; lastName?: string;
+  photoURL?: string; phoneNumber?: string; roles: UserRole[]; addresses?: UserProfileAddress[];
+  createdAt: any; updatedAt: any; lastLoginAt?: any;
+  preferences?: { theme?: 'light' | 'dark'; newsletterSubscribed?: boolean; };
 }
+export type UserProfileCreationData = Omit<UserProfile, 'id' | 'createdAt' | 'updatedAt' | 'roles'> & { roles?: UserRole[]; };
+export type UserProfileUpdateData = Partial<Omit<UserProfile, 'id' | 'email' | 'createdAt' | 'updatedAt' | 'roles'>>;
 
-export interface RegisterData {
-  name: string;
-  email: string;
-  password: string;
-  phone?: string;
-}
+console.log(`(Service-Backend) User Service: Using Firestore collection: ${USERS_COLLECTION}`);
 
-export interface Address {
-  id: string;
-  name: string;
-  street: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  country: string;
-  isDefault: boolean;
-}
-
-// Local storage keys
-const USER_KEY = 'instant-cart-user';
-const USERS_DB_KEY = 'instant-cart-users';
-
-/**
- * Register a new user
- * @param userData - User registration data
- * @returns User object if successful, null if failed
- */
-export const registerUser = (userData: RegisterData): User | null => {
+export const upsertUserProfileBE = async (uid: string, profileData: Partial<UserProfileCreationData>): Promise<UserProfile> => {
+  console.log(`(Service-Backend) upsertUserProfileBE for UID ${uid} with:`, profileData);
   try {
-    // Check if user already exists
-    const existingUsers = JSON.parse(localStorage.getItem(USERS_DB_KEY) || '[]');
-    const userExists = existingUsers.some((user: User) => user.email === userData.email);
+    const userDocRef = db.collection(USERS_COLLECTION).doc(uid);
+    const now = adminInstance.firestore.FieldValue.serverTimestamp();
     
-    if (userExists) {
-      toast.error('A user with this email already exists');
-      return null;
-    }
-    
-    // Create new user
-    const newUser: User = {
-      id: crypto.randomUUID(),
-      email: userData.email,
-      name: userData.name,
-      phone: userData.phone,
-      createdAt: new Date().toISOString()
+    const dataForFirestore: any = {
+        // Ensure email is always present and sourced reliably (e.g. from Auth user record during creation)
+        email: profileData.email, 
+        displayName: profileData.displayName,
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        photoURL: profileData.photoURL,
+        phoneNumber: profileData.phoneNumber,
+        preferences: profileData.preferences || {},
+        updatedAt: now, // This will be set on update, and also initially if merged.
+        lastLoginAt: now, // Update last login time on upsert
     };
-    
-    // Store in users database (localStorage)
-    const updatedUsers = [...existingUsers, 
-      {
-        ...newUser,
-        password: userData.password // In a real app, password would be hashed
-      }
-    ];
-    localStorage.setItem(USERS_DB_KEY, JSON.stringify(updatedUsers));
-    
-    // Set as current user (without password)
-    localStorage.setItem(USER_KEY, JSON.stringify(newUser));
-    
-    toast.success('Registration successful!');
-    return newUser;
-  } catch (error) {
-    console.error('Registration error:', error);
-    toast.error('Failed to register. Please try again.');
-    return null;
-  }
-};
 
-/**
- * Log in a user
- * @param credentials - Login credentials
- * @returns User object if successful, null if failed
- */
-export const loginUser = (credentials: LoginCredentials): User | null => {
-  try {
-    const { email, password } = credentials;
-    const users = JSON.parse(localStorage.getItem(USERS_DB_KEY) || '[]');
-    
-    // Find matching user
-    const user = users.find((u: any) => 
-      u.email === email && u.password === password
-    );
-    
-    if (!user) {
-      toast.error('Invalid email or password');
-      return null;
-    }
-    
-    // Store user in local storage (without password)
-    const { password: _, ...userWithoutPassword } = user;
-    localStorage.setItem(USER_KEY, JSON.stringify(userWithoutPassword));
-    
-    toast.success('Login successful!');
-    return userWithoutPassword;
-  } catch (error) {
-    console.error('Login error:', error);
-    toast.error('Failed to log in. Please try again.');
-    return null;
-  }
-};
-
-/**
- * Log out the current user
- */
-export const logoutUser = (): void => {
-  localStorage.removeItem(USER_KEY);
-  toast.success('You have been logged out');
-};
-
-/**
- * Get the current logged-in user
- * @returns User object if logged in, null if not
- */
-export const getCurrentUser = (): User | null => {
-  try {
-    const userJson = localStorage.getItem(USER_KEY);
-    return userJson ? JSON.parse(userJson) : null;
-  } catch (error) {
-    console.error('Error getting current user:', error);
-    return null;
-  }
-};
-
-/**
- * Update user profile
- * @param userId - User ID
- * @param updatedData - Updated user data
- * @returns Updated user object if successful, null if failed
- */
-export const updateUserProfile = (
-  userId: string, 
-  updatedData: Partial<Omit<User, 'id' | 'email' | 'createdAt'>>
-): User | null => {
-  try {
-    // Get users database
-    const users = JSON.parse(localStorage.getItem(USERS_DB_KEY) || '[]');
-    
-    // Find user index
-    const userIndex = users.findIndex((u: User) => u.id === userId);
-    
-    if (userIndex === -1) {
-      toast.error('User not found');
-      return null;
-    }
-    
-    // Update user data
-    const updatedUser = {
-      ...users[userIndex],
-      ...updatedData
+    // Data to be set only upon creation of the document
+    const onCreationData = {
+        createdAt: now,
+        roles: profileData.roles || ['customer'], // Default role
+        email: profileData.email, // ensure email is set on create too
     };
-    
-    // Save back to database
-    users[userIndex] = updatedUser;
-    localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
-    
-    // Update current user if it's the same user
-    const currentUser = getCurrentUser();
-    if (currentUser && currentUser.id === userId) {
-      const { password: _, ...userWithoutPassword } = updatedUser;
-      localStorage.setItem(USER_KEY, JSON.stringify(userWithoutPassword));
-    }
-    
-    toast.success('Profile updated successfully');
-    return updatedUser;
-  } catch (error) {
-    console.error('Error updating profile:', error);
-    toast.error('Failed to update profile. Please try again.');
-    return null;
-  }
-};
 
-/**
- * Update user password
- * @param userId - User ID
- * @param currentPassword - Current password for verification
- * @param newPassword - New password to set
- * @returns Boolean indicating success
- */
-export const updateUserPassword = (
-  userId: string,
-  currentPassword: string,
-  newPassword: string
-): Promise<boolean> => {
-  return new Promise((resolve, reject) => {
-    try {
-      // Get users database
-      const users = JSON.parse(localStorage.getItem(USERS_DB_KEY) || '[]');
-      
-      // Find user
-      const userIndex = users.findIndex((u: any) => u.id === userId);
-      
-      if (userIndex === -1) {
-        toast.error('User not found');
-        reject(new Error('User not found'));
-        return;
-      }
-      
-      // Verify current password
-      if (users[userIndex].password !== currentPassword) {
-        toast.error('Current password is incorrect');
-        reject(new Error('Current password is incorrect'));
-        return;
-      }
-      
-      // Update password
-      users[userIndex].password = newPassword;
-      
-      // Save back to database
-      localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
-      
-      resolve(true);
-    } catch (error) {
-      console.error('Error updating password:', error);
-      reject(error);
-    }
-  });
-};
-
-/**
- * Add a new address to user's address book
- * @param userId - User ID
- * @param addressData - Address data
- * @returns The added address with ID if successful, null if failed
- */
-export const addUserAddress = (
-  userId: string, 
-  addressData: Omit<Address, 'id'>
-): Promise<Address | null> => {
-  return new Promise((resolve, reject) => {
-    try {
-      // Create new address with ID
-      const newAddress: Address = {
-        ...addressData,
-        id: crypto.randomUUID(),
-      };
-      
-      // Get existing addresses
-      const addressesKey = `user-addresses-${userId}`;
-      const existingAddresses = JSON.parse(localStorage.getItem(addressesKey) || '[]');
-      
-      // If this is the first address or marked as default, ensure it's set as default
-      if (existingAddresses.length === 0 || newAddress.isDefault) {
-        newAddress.isDefault = true;
-        
-        // If setting as default, update all other addresses
-        const updatedAddresses = existingAddresses.map((addr: Address) => ({
-          ...addr,
-          isDefault: false
-        }));
-        
-        // Save all addresses with new one
-        localStorage.setItem(addressesKey, JSON.stringify([...updatedAddresses, newAddress]));
+    // Atomically create if not exists, or update if exists.
+    // set with {merge: true} will create or overwrite specified fields.
+    // To only set `createdAt` and `roles` on actual creation, a transaction is more robust.
+    await db.runTransaction(async (transaction) => {
+      const userDoc = await transaction.get(userDocRef);
+      if (!userDoc.exists) {
+        // Document does not exist, create it with initial fields
+        transaction.set(userDocRef, { ...dataForFirestore, ...onCreationData });
       } else {
-        // Add to existing addresses
-        localStorage.setItem(addressesKey, JSON.stringify([...existingAddresses, newAddress]));
+        // Document exists, update it (createdAt and roles from onCreationData will not be applied here)
+        transaction.update(userDocRef, dataForFirestore);
       }
-      
-      resolve(newAddress);
-    } catch (error) {
-      console.error('Error adding address:', error);
-      reject(error);
-    }
-  });
-};
+    });
 
-/**
- * Delete an address from user's address book
- * @param userId - User ID
- * @param addressId - Address ID to delete
- * @returns Boolean indicating success
- */
-export const deleteUserAddress = (
-  userId: string,
-  addressId: string
-): Promise<boolean> => {
-  return new Promise((resolve, reject) => {
-    try {
-      // Get existing addresses
-      const addressesKey = `user-addresses-${userId}`;
-      const addresses = JSON.parse(localStorage.getItem(addressesKey) || '[]');
-      
-      // Find address
-      const addressIndex = addresses.findIndex((a: Address) => a.id === addressId);
-      
-      if (addressIndex === -1) {
-        reject(new Error('Address not found'));
-        return;
-      }
-      
-      // Check if this is the default address
-      const isDefault = addresses[addressIndex].isDefault;
-      
-      // Remove the address
-      const updatedAddresses = addresses.filter((a: Address) => a.id !== addressId);
-      
-      // If we removed the default address and there are other addresses, set a new default
-      if (isDefault && updatedAddresses.length > 0) {
-        updatedAddresses[0].isDefault = true;
-      }
-      
-      // Save updated addresses
-      localStorage.setItem(addressesKey, JSON.stringify(updatedAddresses));
-      
-      resolve(true);
-    } catch (error) {
-      console.error('Error deleting address:', error);
-      reject(error);
-    }
-  });
-};
+    const updatedProfileSnap = await userDocRef.get();
+    if (!updatedProfileSnap.exists) throw new Error ('User profile not found after upsert');
+    return { id: updatedProfileSnap.id, ...updatedProfileSnap.data() } as UserProfile;
 
-/**
- * Get user order history
- * @param userId - User ID
- * @returns Array of orders for the user
- */
-export const getUserOrders = (userId: string): any[] => {
-  try {
-    // In a real app, this would fetch from a backend API
-    // For demo, we'll just read from localStorage
-    const ordersJson = localStorage.getItem('userOrders') || '{}';
-    const allOrders = JSON.parse(ordersJson);
-    
-    return allOrders[userId] || [];
   } catch (error) {
-    console.error('Error fetching user orders:', error);
-    return [];
+    console.error(`Error in upsertUserProfileBE for UID ${uid}:`, error);
+    throw error;
   }
-}; 
+};
+
+export const getUserProfileBE = async (uid: string): Promise<UserProfile | null> => {
+  console.log(`(Service-Backend) getUserProfileBE for UID: ${uid}`);
+  try {
+    const userDocRef = db.collection(USERS_COLLECTION).doc(uid);
+    const docSnap = await userDocRef.get();
+    if (!docSnap.exists) {
+        // Optionally, if an auth user exists but no Firestore profile, create one.
+        // This can be useful for migrating users or handling edge cases.
+        /* try {
+            const authUser = await auth.getUser(uid);
+            if (authUser && authUser.email) {
+               console.log(`User profile for ${uid} not found in Firestore, attempting to create from Auth info...`);
+               return upsertUserProfileBE(uid, { email: authUser.email!, displayName: authUser.displayName, photoURL: authUser.photoURL });
+            }
+        } catch (authError) {
+            console.warn(`Auth user ${uid} not found while trying to auto-create profile:`, authError);
+        } */
+        return null;
+    }
+    return { id: docSnap.id, ...docSnap.data() } as UserProfile;
+  } catch (error) {
+    console.error(`Error in getUserProfileBE for UID ${uid}:`, error);
+    throw error;
+  }
+};
+
+export const updateUserProfileBE = async (uid: string, profileUpdateData: UserProfileUpdateData): Promise<UserProfile> => {
+  console.log(`(Service-Backend) updateUserProfileBE for UID ${uid} with:`, profileUpdateData);
+  try {
+    const userDocRef = db.collection(USERS_COLLECTION).doc(uid);
+    const dataToUpdate: any = {
+      ...profileUpdateData,
+      updatedAt: adminInstance.firestore.FieldValue.serverTimestamp(),
+    };
+    Object.keys(dataToUpdate).forEach(key => dataToUpdate[key] === undefined && delete dataToUpdate[key]);
+
+    await userDocRef.update(dataToUpdate);
+    const updatedProfileSnap = await userDocRef.get();
+    if (!updatedProfileSnap.exists) throw new Error('User profile not found after update');
+    return { id: updatedProfileSnap.id, ...updatedProfileSnap.data() } as UserProfile;
+  } catch (error) {
+    console.error(`Error in updateUserProfileBE for UID ${uid}:`, error);
+    throw error;
+  }
+};
+
+export const deleteUserProfileBE = async (uid: string): Promise<void> => {
+  console.log(`(Service-Backend) deleteUserProfileBE for UID: ${uid}`);
+  try {
+    // It's crucial to delete the Auth user as well, usually before or after this Firestore delete.
+    // This function assumes Auth user deletion is handled by the caller or an Auth trigger.
+    // await auth.deleteUser(uid); // If called from an admin context not an auth trigger.
+    await db.collection(USERS_COLLECTION).doc(uid).delete();
+    console.log(`Firestore profile for UID ${uid} deleted.`);
+  } catch (error) {
+    console.error(`Error in deleteUserProfileBE for UID ${uid}:`, error);
+    throw error;
+  }
+};
+
+export const updateUserRolesBE = async (uid: string, roles: UserRole[]): Promise<void> => {
+    console.log(`(Service-Backend) updateUserRolesBE for UID ${uid} with roles:`, roles);
+    try {
+        const userDocRef = db.collection(USERS_COLLECTION).doc(uid);
+        await userDocRef.update({
+            roles: roles,
+            updatedAt: adminInstance.firestore.FieldValue.serverTimestamp(),
+        });
+        // For roles to be effective in Firebase security rules via `auth.token.roles`,
+        // you MUST set custom claims on the Firebase Auth user.
+        // await auth.setCustomUserClaims(uid, { roles });
+        // console.log(`Custom claims set for user ${uid} with roles:`, roles);
+    } catch (error) {
+        console.error(`Error in updateUserRolesBE for UID ${uid}:`, error);
+        throw error;
+    }
+};

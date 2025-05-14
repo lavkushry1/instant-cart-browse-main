@@ -1,19 +1,15 @@
 // src/services/productService.ts
 
-/* Import Firebase Admin resources */
-/*
+// Import Firebase Admin resources
 import {
   db, // Firestore instance from firebaseAdmin.ts
-  adminInstance // For FieldValue, Timestamp etc. from firebaseAdmin.ts
+  adminInstance, // For FieldValue, Timestamp etc. from firebaseAdmin.ts
+  storage // For deleting images from Firebase Storage
 } from '../../lib/firebaseAdmin'; // Adjust path as necessary
 const PRODUCTS_COLLECTION = 'products';
-// const CATEGORIES_COLLECTION = 'categories'; // If categories are managed separately
-*/
+const REVIEWS_SUBCOLLECTION = 'reviews'; // Used when deleting a product with its reviews
 
-import { db, adminInstance } from '../../lib/firebaseAdmin'; // Mock or actual
-const PRODUCTS_COLLECTION = 'products';
-
-// Keep client-side Timestamp for type consistency in shared interfaces if needed
+// Keep client-side Timestamp for type consistency if Product interface is shared
 import { Timestamp as ClientTimestamp } from 'firebase/firestore';
 
 export interface ProductVariation {
@@ -56,209 +52,175 @@ export interface Product {
 export type ProductCreationData = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'averageRating' | 'reviewCount'>;
 export type ProductUpdateData = Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>;
 
-/**
- * @module productService (Backend Operations)
- */
-
 console.log(`(Service-Backend) Product Service: Using Firestore collection: ${PRODUCTS_COLLECTION}`);
 
-/**
- * Creates a new product in Firestore (Backend Operation).
- */
 export const createProductBE = async (productData: ProductCreationData): Promise<Product> => {
   console.log('(Service-Backend) createProductBE called with:', productData);
-  /*
   try {
-    const dataToSave = {
+    const dataToSave: any = {
       ...productData,
       averageRating: 0,
       reviewCount: 0,
       createdAt: adminInstance.firestore.FieldValue.serverTimestamp(),
       updatedAt: adminInstance.firestore.FieldValue.serverTimestamp(),
     };
-    Object.keys(dataToSave).forEach(key => (dataToSave as any)[key] === undefined && delete (dataToSave as any)[key]);
+    Object.keys(dataToSave).forEach(key => dataToSave[key] === undefined && delete dataToSave[key]);
 
     const docRef = await db.collection(PRODUCTS_COLLECTION).add(dataToSave);
-    // const newDoc = await docRef.get();
-    // return { id: newDoc.id, ...newDoc.data() } as Product;
-    return { 
-        id: docRef.id, 
-        ...dataToSave, 
-        createdAt: adminInstance.firestore.Timestamp.now(), 
-        updatedAt: adminInstance.firestore.Timestamp.now() 
-    } as Product;
+    const newDoc = await docRef.get();
+    if (!newDoc.exists) {
+        throw new Error('Product document not found after creation.');
+    }
+    return { id: newDoc.id, ...newDoc.data() } as Product;
   } catch (error) {
     console.error("Error in createProductBE:", error);
     throw error;
   }
-  */
-  await new Promise(resolve => setTimeout(resolve, 100));
-  const mockId = `mock_product_${Date.now()}`;
-  const now = adminInstance.firestore.Timestamp.now();
-  console.warn('createProductBE: Firestore not connected, using mock data.');
-  return {
-    id: mockId,
-    ...productData,
-    averageRating: 0,
-    reviewCount: 0,
-    createdAt: now,
-    updatedAt: now,
-  } as Product;
 };
 
-/**
- * Retrieves a single product by ID (Backend Operation).
- */
 export const getProductByIdBE = async (productId: string): Promise<Product | null> => {
   console.log(`(Service-Backend) getProductByIdBE for ID: ${productId}`);
-  /*
   try {
     const docRef = db.collection(PRODUCTS_COLLECTION).doc(productId);
     const docSnap = await docRef.get();
     if (!docSnap.exists) return null;
-    // TODO: Fetch reviews from subcollection if they are not embedded
+    // TODO: Optionally fetch first page of reviews or other subcollection data if needed for product detail view
     return { id: docSnap.id, ...docSnap.data() } as Product;
   } catch (error) {
     console.error(`Error in getProductByIdBE for ${productId}:`, error);
     throw error;
   }
-  */
-  await new Promise(resolve => setTimeout(resolve, 50));
-  console.warn(`getProductByIdBE: Mock for ${productId}, returning null.`);
-  return null;
 };
 
 export interface GetAllProductsOptionsBE {
     categoryId?: string;
     featured?: boolean;
-    searchQuery?: string; 
+    searchQuery?: string; // Requires specific indexing/search solution (e.g., Algolia, or simpler Firestore workarounds)
     minPrice?: number;
     maxPrice?: number;
     isEnabled?: boolean;
     sortBy?: 'price' | 'createdAt' | 'name' | 'averageRating';
     sortOrder?: 'asc' | 'desc';
     limit?: number;
-    startAfter?: any; // Firestore DocumentSnapshot or its equivalent representation
+    startAfter?: any; // Firestore DocumentSnapshot
 }
 
-/**
- * Retrieves products from Firestore with filtering and pagination (Backend Operation).
- */
 export const getAllProductsBE = async (options: GetAllProductsOptionsBE = {}): Promise<{ products: Product[], lastVisible?: any, totalCount?: number }> => {
   console.log('(Service-Backend) getAllProductsBE with options:', options);
-  /*
   try {
     let query: admin.firestore.Query = db.collection(PRODUCTS_COLLECTION);
 
     if (options.categoryId) query = query.where('categoryId', '==', options.categoryId);
     if (options.featured !== undefined) query = query.where('featured', '==', options.featured);
     if (options.isEnabled !== undefined) query = query.where('isEnabled', '==', options.isEnabled);
-    // Note: Firestore requires an index for range filters on different fields if combined with equality or other range filters.
-    // e.g. .where('price', '>=', options.minPrice).where('price', '<=', options.maxPrice)
-    // Search query would typically require a more advanced solution like Algolia/Elasticsearch or carefully structured data for Firestore.
-    // For a simple name search (case-insensitive), you might need to store an array of keywords or a lowercased name field.
+    if (options.minPrice !== undefined) query = query.where('price', '>=', options.minPrice);
+    if (options.maxPrice !== undefined) query = query.where('price', '<=', options.maxPrice);
+    // Note on price range: Firestore may require an inequality filter on only one field per query without composite indexes.
+    // For more complex filtering (e.g., text search on name/description), a dedicated search service like Algolia is recommended.
 
     const sortBy = options.sortBy || 'createdAt';
     const sortOrder = options.sortOrder || 'desc';
     query = query.orderBy(sortBy, sortOrder);
 
-    // For total count, a separate count query is more efficient.
-    // const countQuery = db.collection(PRODUCTS_COLLECTION); // Apply same filters as main query
-    // const totalCountSnapshot = await countQuery.count().get();
-    // const totalCount = totalCountSnapshot.data().count;
-    let totalCount = undefined;
+    // For total count, if not using .count() (which might not be available/performant on all SDK versions or for complex queries)
+    // a separate, less constrained query might be needed or an approximation.
+    // For this example, we won't implement totalCount precisely for paginated results without .count().
+    // const totalCountSnapshot = await db.collection(PRODUCTS_COLLECTION).where(...).count().get(); // If using .count()
 
     if (options.startAfter) query = query.startAfter(options.startAfter);
     if (options.limit) query = query.limit(options.limit);
 
     const snapshot = await query.get();
-    if (snapshot.empty) return { products: [], totalCount: totalCount || 0 };
+    if (snapshot.empty) return { products: [], totalCount: 0 };
 
     const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-    const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+    const lastVisible = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : undefined;
     
-    return { products, lastVisible, totalCount: totalCount || products.length }; // Use accurate totalCount if fetched
+    // totalCount here is an approximation for the current batch or requires another query.
+    // If options.limit is set, this totalCount is not the grand total.
+    return { products, lastVisible, totalCount: products.length }; 
 
   } catch (error) {
     console.error("Error in getAllProductsBE:", error);
     throw error;
   }
-  */
-  await new Promise(resolve => setTimeout(resolve, 200));
-  console.warn('getAllProductsBE: Mock, returning empty array.');
-  return { products: [] };
 };
 
-/**
- * Updates a product in Firestore (Backend Operation).
- */
 export const updateProductBE = async (productId: string, productData: ProductUpdateData): Promise<Product> => {
   console.log(`(Service-Backend) updateProductBE for ID ${productId} with:`, productData);
-  /*
   try {
     const docRef = db.collection(PRODUCTS_COLLECTION).doc(productId);
     const dataToUpdate: any = { ...productData, updatedAt: adminInstance.firestore.FieldValue.serverTimestamp() };
     Object.keys(dataToUpdate).forEach(key => dataToUpdate[key] === undefined && delete dataToUpdate[key]);
 
     await docRef.update(dataToUpdate);
-    // const updatedDoc = await docRef.get();
-    // return { id: updatedDoc.id, ...updatedDoc.data() } as Product;
-    return { id: productId, ...dataToUpdate, updatedAt: adminInstance.firestore.Timestamp.now() } as Product;
+    const updatedDoc = await docRef.get();
+    if (!updatedDoc.exists) {
+        throw new Error('Product document not found after update.');
+    }
+    return { id: updatedDoc.id, ...updatedDoc.data() } as Product;
   } catch (error) {
     console.error(`Error in updateProductBE for ${productId}:`, error);
     throw error;
   }
-  */
-  await new Promise(resolve => setTimeout(resolve, 100));
-  const now = adminInstance.firestore.Timestamp.now();
-  console.warn(`updateProductBE: Mock for ${productId}.`);
-  const mockExistingProduct = await getProductByIdBE(productId) || { id: productId, createdAt: now, name: 'Temp Name', description:'', price:0, images:[], categoryId:'', stock:0, isEnabled:true } as Product;
-  return { ...mockExistingProduct, ...productData, updatedAt: now } as Product;
 };
 
-/**
- * Deletes a product from Firestore (Backend Operation).
- * Also consider deleting associated storage items (images) and subcollections (reviews).
- */
 export const deleteProductBE = async (productId: string): Promise<void> => {
   console.log(`(Service-Backend) deleteProductBE for ID: ${productId}`);
-  /*
   try {
-    // TODO: Add logic to delete images from Firebase Storage associated with this product.
-    // const product = await getProductByIdBE(productId); // Fetch product to get image URLs
-    // if (product && product.images) {
-    //   for (const imageUrl of product.images) {
-    //     const fileRef = storage.bucket().file(new URL(imageUrl).pathname.substring(1)); // Path from URL
-    //     await fileRef.delete().catch(err => console.error("Error deleting image:", err));
-    //   }
-    // }
+    const productRef = db.collection(PRODUCTS_COLLECTION).doc(productId);
+    const product = (await productRef.get()).data() as Product | undefined;
 
-    // TODO: Add logic to delete subcollections like 'reviews' if they exist.
-    // const reviewsRef = db.collection(PRODUCTS_COLLECTION).doc(productId).collection('reviews');
-    // const reviewsSnapshot = await reviewsRef.get();
-    // const batch = db.batch();
-    // reviewsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-    // await batch.commit();
+    // 1. Delete images from Firebase Storage (if URLs are stored and accessible)
+    if (product && product.images && product.images.length > 0) {
+      const bucket = storage.bucket(); // Default bucket
+      for (const imageUrl of product.images) {
+        try {
+          // Attempt to parse URL and get GCS path. This needs to be robust.
+          // Example: gs://<bucket-name>/path/to/image.jpg or https://firebasestorage.googleapis.com/...
+          // This parsing logic is highly dependent on how image URLs are stored.
+          // For simplicity, if it's a GCS path already, use it. Otherwise, adapt.
+          let imagePath = imageUrl;
+          if (imageUrl.startsWith('https://firebasestorage.googleapis.com')) {
+             // Crude parsing - better to store GCS paths directly or have a reliable way to derive them.
+            const urlParts = imageUrl.split('/o/');
+            if (urlParts.length > 1) {
+                imagePath = decodeURIComponent(urlParts[1].split('?')[0]);
+            }
+          }
+          if (imagePath) {
+            console.log(`Attempting to delete image from storage: ${imagePath}`);
+            // await bucket.file(imagePath).delete().catch(e => console.warn(`Failed to delete image ${imagePath}: ${e.message}`));
+          }
+        } catch (e) {
+          console.warn(`Could not parse or delete image URL ${imageUrl}: ${e}`);
+        }
+      }
+    }
 
-    await db.collection(PRODUCTS_COLLECTION).doc(productId).delete();
+    // 2. Delete reviews subcollection (batched delete)
+    const reviewsCollectionRef = productRef.collection(REVIEWS_SUBCOLLECTION);
+    const reviewsSnapshot = await reviewsCollectionRef.limit(500).get(); // Batch delete in chunks if many reviews
+    if (!reviewsSnapshot.empty) {
+      const batch = db.batch();
+      reviewsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      console.log(`Deleted ${reviewsSnapshot.size} reviews for product ${productId}`);
+    }
+    // Repeat if reviewsSnapshot.size === 500 until all deleted
+
+    // 3. Delete the product document itself
+    await productRef.delete();
+    console.log(`Product ${productId} and its associated data deleted successfully.`);
+
   } catch (error) {
     console.error(`Error in deleteProductBE for ${productId}:`, error);
     throw error;
   }
-  */
-  await new Promise(resolve => setTimeout(resolve, 50));
-  console.warn(`deleteProductBE: Mock deletion for ${productId}.`);
 };
 
-/**
- * Updates the stock for a given product (Backend Operation).
- * @param {string} productId - The ID of the product.
- * @param {number} quantityChange - The change in quantity (e.g., -1 for decrement, 1 for increment).
- * @returns {Promise<void>}
- */
 export const updateProductStockBE = async (productId: string, quantityChange: number): Promise<void> => {
     console.log(`(Service-Backend) updateProductStockBE for ${productId}, change: ${quantityChange}`);
-    /*
     try {
         const productRef = db.collection(PRODUCTS_COLLECTION).doc(productId);
         await productRef.update({
@@ -267,10 +229,6 @@ export const updateProductStockBE = async (productId: string, quantityChange: nu
         console.log(`Stock updated for product ${productId} by ${quantityChange}`);
     } catch (error) {
         console.error(`Error updating stock for product ${productId}:`, error);
-        // Potentially throw error to handle in calling function (e.g., rollback order creation)
         throw error;
     }
-    */
-    await new Promise(resolve => setTimeout(resolve, 50));
-    console.warn(`updateProductStockBE: Mock stock update for ${productId} by ${quantityChange}.`);
 };

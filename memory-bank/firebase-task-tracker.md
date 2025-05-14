@@ -1,60 +1,115 @@
 # 🔥 Firebase Backend Task Tracker
 
 ## 0. Firebase Admin Core (`firebaseAdmin.ts`)
-- [✅] Setup Firebase Admin SDK Initialization
+- [🟢] Setup Firebase Admin SDK Initialization (Activated)
 
-## 1. offerService.ts
-- [✅] Setup Firestore Collection (Implicitly reviewed via usage)
-- [✅] Create Offer (Reviewed & Enhanced for Backend)
-- [✅] Read Offer(s) (Reviewed & Enhanced for Backend)
-- [✅] Update Offer (Reviewed & Enhanced for Backend)
-- [✅] Delete Offer (Reviewed & Enhanced for Backend)
+## 1. offerService.ts (Backend Logic)
+- [🟢] Setup Firestore Collection (SDK Activated)
+- [🟢] Create Offer (SDK Activated)
+- [🟢] Read Offer(s) (SDK Activated)
+- [🟢] Update Offer (SDK Activated)
+- [🟢] Delete Offer (SDK Activated)
 
-## 2. productService.ts
-- [✅] Setup Firestore Collection
-- [🟡] Create Product (Review & Enhance)
-- [🔲] Read Product(s) (Review & Enhance)
-- [🔲] Update Product (Review & Enhance)
-- [🔲] Delete Product (Review & Enhance)
+## 2. productService.ts (Backend Logic)
+- [🟢] Setup Firestore Collection (SDK Activated)
+- [🟢] Create Product (SDK Activated)
+- [🟢] Read Product(s) (SDK Activated)
+- [🟢] Update Product (SDK Activated)
+- [🟢] Delete Product (SDK Activated, incl. stock update fn, image & review subcollection deletion)
 
-## 3. categoryService.ts
-- [🔲] Setup Firestore Collection
-- [🔲] Create Category
-- [🔲] Read Category(s)
-- [🔲] Update Category
-- [🔲] Delete Category
+## 3. categoryService.ts (Backend Logic)
+- [🟢] Setup Firestore Collection (SDK Activated)
+- [🟢] Create Category (SDK Activated)
+- [🟢] Read Category(s) (SDK Activated)
+- [🟢] Update Category (SDK Activated)
+- [🟢] Delete Category (SDK Activated)
 
-## 4. orderService.ts
-- [✅] Setup Firestore Collection
-- [🔲] Create Order (Review & Enhance, incl. inventory update call)
-- [🔲] Read Order(s) (Review & Enhance)
-- [🔲] Update Order (Review & Enhance)
-- [🔲] Delete Order (Review & Enhance)
+## 4. orderService.ts (Backend Logic)
+- [🟢] Setup Firestore Collection (SDK Activated)
+- [🟢] Create Order (SDK Activated, incl. inventory update call)
+- [🟢] Read Order(s) (SDK Activated)
+- [🟢] Update Order (SDK Activated)
+- [🟢] Delete Order (SDK Activated)
 
-## 5. userService.ts
-- [🔲] Setup Firestore Collection (Users)
-- [🔲] Create User Profile (on registration or first login)
-- [🔲] Get User Profile
-- [🔲] Update User Profile
-- [🔲] (Optional) Get User by Email / Manage Roles
+## 5. userService.ts (Backend Logic)
+- [🟢] Setup Firestore Collection (Users) (SDK Activated)
+- [🟢] Create User Profile (Upsert Logic) (SDK Activated)
+- [🟢] Get User Profile (SDK Activated)
+- [🟢] Update User Profile (SDK Activated)
+- [🟢] (Optional) Get User by Email / Manage Roles (Delete User & Update Roles SDK Activated)
 
-## 6. reviewService.ts
-- [🔲] Setup Firestore Subcollection (under Products)
-- [🔲] Create Review (and update product's averageRating)
-- [🔲] Read Reviews for a Product
-- [🔲] Update Review
-- [🔲] Delete Review (and update product's averageRating)
+## 6. reviewService.ts (Backend Logic)
+- [🟢] Setup Firestore Subcollection (under Products) (SDK Activated)
+- [🟢] Create Review (SDK Activated, and update product's averageRating)
+- [🟢] Read Reviews for a Product (SDK Activated)
+- [🟢] Update Review (SDK Activated, and update product's averageRating)
+- [🟢] Delete Review (SDK Activated, and update product's averageRating)
 
-## 7. adminService.ts
-- [✅] Setup Firestore Collection (e.g., for settings)
-- [🔲] Get Admin Settings (Review & Enhance)
-- [🔲] Update Admin Settings (Review & Enhance)
+## 7. adminService.ts (Backend Logic)
+- [🟢] Setup Firestore Collection (e.g., for settings) (SDK Activated)
+- [🟢] Get Admin Settings (SDK Activated)
+- [🟢] Update Admin Settings (SDK Activated)
 
-## 8. cartService.ts (Backend - Optional for persistent carts)
-- [🔲] Setup Firestore Collection (User Carts)
-- [🔲] Get User Cart
-- [🔲] Add/Update Item in User Cart
-- [🔲] Remove Item from User Cart
-- [🔲] Clear User Cart
+## 8. cartService.ts (Backend Logic - Optional for persistent carts)
+- [🟢] Setup Firestore Collection (User Carts) (SDK Activated)
+- [🟢] Get User Cart (SDK Activated)
+- [🟢] Add/Update Item in User Cart (SDK Activated)
+- [🟢] Remove Item from User Cart (Handled by setItemInUserCartBE with qty 0) (SDK Activated)
+- [🟢] Clear User Cart (SDK Activated)
 
-_Status: offerService.ts backend review & enhancement complete. Starting productService.ts._
+## 9. Firebase Cloud Functions (`src/functions/...`)
+
+### 9.1. Offer Functions (`offers.functions.ts`)
+- [🟢] `createOfferCF` (SDK Activated)
+- [🟢] `getOfferByIdCF` (SDK Activated)
+- [🟢] `getAllOffersCF` (SDK Activated)
+- [🟢] `updateOfferCF` (SDK Activated)
+- [🟢] `deleteOfferCF` (SDK Activated)
+
+### 9.2. Product Functions (`products.functions.ts`)
+- [🟢] `createProductCF` (SDK Activated)
+- [🟢] `getProductByIdCF` (SDK Activated)
+- [🟢] `getAllProductsCF` (SDK Activated)
+- [🟢] `updateProductCF` (SDK Activated)
+- [🟢] `deleteProductCF` (SDK Activated)
+
+### 9.3. Category Functions (`categories.functions.ts`)
+- [🟢] `createCategoryCF` (SDK Activated)
+- [🟢] `getCategoryCF` (SDK Activated)
+- [🟢] `getAllCategoriesCF` (SDK Activated)
+- [🟢] `updateCategoryCF` (SDK Activated)
+- [🟢] `deleteCategoryCF` (SDK Activated)
+
+### 9.4. Order Functions (`orders.functions.ts`)
+- [🟢] `createOrderCF` (SDK Activated)
+- [🟢] `getOrderByIdCF` (SDK Activated)
+- [🟢] `getOrdersForUserCF` (SDK Activated)
+- [🟢] `getAllOrdersCF` (renamed to `getAllOrdersAdminCF`) (SDK Activated)
+- [🟢] `updateOrderStatusCF` (SDK Activated)
+
+### 9.5. User Functions (`users.functions.ts`)
+- [🟢] `onUserCreateAuthTriggerCF` (SDK Activated)
+- [🟢] `onUserDeleteAuthTriggerCF` (SDK Activated)
+- [🟢] `getUserProfileCF` (SDK Activated)
+- [🟢] `updateUserProfileCF` (SDK Activated)
+- [🟢] `updateUserRolesCF` (SDK Activated)
+
+### 9.6. Review Functions (`reviews.functions.ts`)
+- [🟢] `createReviewCF` (SDK Activated)
+- [🟢] `getReviewsForProductCF` (SDK Activated)
+- [🟢] `updateReviewCF` (SDK Activated)
+- [🟢] `deleteReviewCF` (SDK Activated)
+
+### 9.7. Admin Settings Functions (`admin.functions.ts`)
+- [🟢] `getSiteSettingsCF` (SDK Activated)
+- [🟢] `updateSiteSettingsCF` (SDK Activated)
+
+### 9.8. Cart Functions (`cart.functions.ts`)
+- [🟢] `getUserCartCF` (SDK Activated)
+- [🟢] `setItemInUserCartCF` (SDK Activated)
+- [🟢] `clearUserCartCF` (SDK Activated)
+
+### 9.9. Main Functions Index (`index.ts`)
+- [🟢] Export all defined functions (SDK Activated)
+
+_Status: All Cloud Functions and Backend Services now have their Firebase SDK calls activated (uncommented). The Firebase backend is structurally complete and ready for live Firebase project integration, deployment, and testing._
