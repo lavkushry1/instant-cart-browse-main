@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -32,12 +33,15 @@ const ProductFilter = ({
   onFilterChange,
   initialFilters 
 }: ProductFilterProps) => {
-  const [filters, setFilters] = useState<FilterOptions>({
-    categories: initialFilters?.categories || [],
-    tags: initialFilters?.tags || [],
-    priceRange: initialFilters?.priceRange || [0, maxPrice],
-    inStock: initialFilters?.inStock || false,
-    onSale: initialFilters?.onSale || false
+  const [filters, setFilters] = useState<FilterOptions>(() => {
+    const defaultPriceRange: [number, number] = [0, maxPrice];
+    return {
+      categories: initialFilters?.categories || [],
+      tags: initialFilters?.tags || [],
+      priceRange: initialFilters?.priceRange || defaultPriceRange,
+      inStock: initialFilters?.inStock || false,
+      onSale: initialFilters?.onSale || false
+    };
   });
   
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
@@ -230,7 +234,7 @@ const ProductFilter = ({
                     <Checkbox 
                       id={`category-${category}`} 
                       checked={filters.categories.includes(category)}
-                      onCheckedChange={(checked) => handleCategoryChange(category, checked)}
+                      onCheckedChange={(checked: CheckedState) => handleCategoryChange(category, checked)}
                     />
                     <Label 
                       htmlFor={`category-${category}`}
@@ -254,7 +258,11 @@ const ProductFilter = ({
                   min={0}
                   max={maxPrice}
                   step={100}
-                  onValueValueChange={handlePriceRangeChange}
+                  onValueChange={(value: number[]) => {
+                    if (Array.isArray(value) && value.length === 2) {
+                      handlePriceRangeChange(value as [number, number]);
+                    }
+                  }}
                 />
                 <div className="flex justify-between mt-2 text-sm">
                   <span>₹{filters.priceRange[0]}</span>
@@ -275,7 +283,7 @@ const ProductFilter = ({
                       <Checkbox 
                         id={`tag-${tag}`} 
                         checked={filters.tags.includes(tag)}
-                        onCheckedChange={(checked) => handleTagChange(tag, checked)}
+                        onCheckedChange={(checked: CheckedState) => handleTagChange(tag, checked)}
                       />
                       <Label 
                         htmlFor={`tag-${tag}`}
