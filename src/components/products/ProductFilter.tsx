@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
+import type { CheckedState } from '@radix-ui/react-checkbox';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
@@ -58,19 +59,21 @@ const ProductFilter = ({
     onFilterChange(filters);
   }, [filters, onFilterChange]);
   
-  const handleCategoryChange = (category: string, checked: boolean) => {
+  const handleCategoryChange = (category: string, checked: CheckedState) => {
+    const isChecked = checked === true;
     setFilters(prev => ({
       ...prev,
-      categories: checked 
+      categories: isChecked 
         ? [...prev.categories, category] 
         : prev.categories.filter(c => c !== category)
     }));
   };
   
-  const handleTagChange = (tag: string, checked: boolean) => {
+  const handleTagChange = (tag: string, checked: CheckedState) => {
+    const isChecked = checked === true;
     setFilters(prev => ({
       ...prev,
-      tags: checked 
+      tags: isChecked 
         ? [...prev.tags, tag] 
         : prev.tags.filter(t => t !== tag)
     }));
@@ -83,17 +86,19 @@ const ProductFilter = ({
     }));
   };
   
-  const handleInStockChange = (checked: boolean) => {
+  const handleInStockChange = (checked: CheckedState) => {
+    const isChecked = checked === true;
     setFilters(prev => ({
       ...prev,
-      inStock: checked
+      inStock: isChecked
     }));
   };
   
-  const handleOnSaleChange = (checked: boolean) => {
+  const handleOnSaleChange = (checked: CheckedState) => {
+    const isChecked = checked === true;
     setFilters(prev => ({
       ...prev,
-      onSale: checked
+      onSale: isChecked
     }));
   };
   
@@ -225,7 +230,7 @@ const ProductFilter = ({
                     <Checkbox 
                       id={`category-${category}`} 
                       checked={filters.categories.includes(category)}
-                      onCheckedChange={(checked) => handleCategoryChange(category, checked as boolean)}
+                      onCheckedChange={(checked) => handleCategoryChange(category, checked)}
                     />
                     <Label 
                       htmlFor={`category-${category}`}
@@ -249,7 +254,7 @@ const ProductFilter = ({
                   min={0}
                   max={maxPrice}
                   step={100}
-                  onValueChange={handlePriceRangeChange as any}
+                  onValueValueChange={handlePriceRangeChange}
                 />
                 <div className="flex justify-between mt-2 text-sm">
                   <span>₹{filters.priceRange[0]}</span>
@@ -270,7 +275,7 @@ const ProductFilter = ({
                       <Checkbox 
                         id={`tag-${tag}`} 
                         checked={filters.tags.includes(tag)}
-                        onCheckedChange={(checked) => handleTagChange(tag, checked as boolean)}
+                        onCheckedChange={(checked) => handleTagChange(tag, checked)}
                       />
                       <Label 
                         htmlFor={`tag-${tag}`}
@@ -294,7 +299,7 @@ const ProductFilter = ({
                   <Checkbox 
                     id="in-stock" 
                     checked={filters.inStock}
-                    onCheckedChange={(checked) => handleInStockChange(checked as boolean)}
+                    onCheckedChange={handleInStockChange}
                   />
                   <Label 
                     htmlFor="in-stock"
@@ -307,7 +312,7 @@ const ProductFilter = ({
                   <Checkbox 
                     id="on-sale" 
                     checked={filters.onSale}
-                    onCheckedChange={(checked) => handleOnSaleChange(checked as boolean)}
+                    onCheckedChange={handleOnSaleChange}
                   />
                   <Label 
                     htmlFor="on-sale"
@@ -325,4 +330,4 @@ const ProductFilter = ({
   );
 };
 
-export default ProductFilter; 
+export default ProductFilter;

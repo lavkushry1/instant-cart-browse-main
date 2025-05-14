@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import ProductReviews from './ProductReviews';
+import { toast } from 'react-hot-toast';
 
 // Mock the auth hook
 vi.mock('../hooks/useAuth', () => ({
@@ -143,7 +144,7 @@ describe('ProductReviews', () => {
 
     // Wait for success toast
     await waitFor(() => {
-      expect(require('react-hot-toast').toast.success).toHaveBeenCalledWith(
+      expect(toast.success).toHaveBeenCalledWith(
         'Review submitted successfully!'
       );
     });
@@ -173,4 +174,4 @@ describe('ProductReviews', () => {
       expect(screen.getByText(/helpful \(6\)/i)).toBeInTheDocument();
     });
   });
-}); 
+});

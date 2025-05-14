@@ -843,7 +843,7 @@ const metrics: AnalyticsMetric[] = [
 ];
 
 // In-memory storage
-let analyticsData = generateDailyData(90); // Last 90 days of data
+const analyticsData = generateDailyData(90); // Last 90 days of data
 
 // Advanced Analytics API Functions
 

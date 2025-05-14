@@ -208,7 +208,7 @@ export const analyzeContent = async (content: string, keyword: string): Promise<
       const keywordDensity = (keywordCount / wordCount) * 100;
       
       let readabilityScore = Math.floor(Math.random() * 30) + 70; // Random score between 70-100
-      let suggestions: string[] = [];
+      const suggestions: string[] = [];
       
       if (keywordDensity < 0.5) {
         suggestions.push(`Keyword density is too low (${keywordDensity.toFixed(1)}%). Try to use the keyword more often.`);

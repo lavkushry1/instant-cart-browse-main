@@ -31,7 +31,7 @@ const ProductList = ({ title = 'All Products', products, category }: ProductList
   
   // Apply sorting whenever products or sortBy changes
   React.useEffect(() => {
-    let result = [...products];
+    const result = [...products];
     
     // Apply sorting
     switch (sortBy) {
@@ -207,4 +207,4 @@ const ProductList = ({ title = 'All Products', products, category }: ProductList
   );
 };
 
-export default ProductList; 
+export default ProductList;
