@@ -1,7 +1,7 @@
 // src/pages/Admin/Reviews.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
-import { ThumbsUp, ThumbsDown, Trash2, CheckCircle, XCircle, Filter, Loader2, Eye } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,85 +11,91 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AdminLayout from '@/components/layout/AdminLayout';
 import { ProductReviewBE, ReviewUpdateData, GetReviewsAdminOptionsBE } from '@/services/reviewService';
 
-// Firebase Client SDK imports
 import { functionsClient } from '@/lib/firebaseClient';
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions';
 
-let getReviewsAdminCF: any;
-let updateReviewAdminCF: any; // Assumes updateReviewCF can be used by admin
-let deleteReviewAdminCF: any; // Assumes deleteReviewCF can be used by admin
+let getReviewsAdminCF: HttpsCallable<GetReviewsAdminOptionsBE | undefined, HttpsCallableResult<{ success: boolean; reviews?: ProductReviewBE[]; totalCount?: number; error?: string }>> | undefined;
+let updateReviewAdminCF: HttpsCallable<{ productId: string; reviewId: string; updateData: ReviewUpdateData }, HttpsCallableResult<{ success: boolean; review?: ProductReviewBE; error?: string }>> | undefined;
+let deleteReviewAdminCF: HttpsCallable<{ productId: string; reviewId: string }, HttpsCallableResult<{ success: boolean; message?: string; error?: string }>> | undefined;
 
 if (functionsClient && Object.keys(functionsClient).length > 0) {
   try {
     getReviewsAdminCF = httpsCallable(functionsClient, 'reviews-getReviewsAdminCF');
     updateReviewAdminCF = httpsCallable(functionsClient, 'reviews-updateReviewCF');
     deleteReviewAdminCF = httpsCallable(functionsClient, 'reviews-deleteReviewCF');
-  } catch (error) { console.error("AdminReviews: Error preparing httpsCallable:", error); }
+    console.log("AdminReviews: Live httpsCallable references created.");
+  } catch (error) { 
+    console.error("AdminReviews: Error preparing httpsCallable:", error);
+    toast.error("Error initializing connection to review service.");
+  }
+} else {
+    console.warn("AdminReviews: Firebase functions client not available. Operations will use mocks or fail.");
 }
 
-const callReviewFunctionMock = async (name: string, payload?: any): Promise<any> => {
+const fallbackReviewCall = async (name: string, payload?: any): Promise<any> => {
     console.warn(`MOCKING Review CF call: ${name}`, payload);
     await new Promise(r => setTimeout(r, 300));
     if (name === 'reviews-getReviewsAdminCF') {
         return { data: { success: true, reviews: [
-            { id: 'rev1', productId: 'prod1', productName: 'Laptop Pro', userId: 'userA', reviewerName: 'Alice', rating: 5, comment: 'Great laptop!', createdAt: new Date().toISOString(), approved: true },
-            { id: 'rev2', productId: 'prod2', productName: 'Wireless Mouse', userId: 'userB', reviewerName: 'Bob', rating: 3, comment: 'Okay, but disconnects sometimes.', createdAt: new Date(Date.now()-86400000).toISOString(), approved: false },
-            { id: 'rev3', productId: 'prod1', productName: 'Laptop Pro', userId: 'userC', reviewerName: 'Charlie', rating: 4, comment: 'Good value.', createdAt: new Date(Date.now()-172800000).toISOString(), approved: true },
-        ], totalCount: 3 } };
+            { id: 'rev1', productId: 'prod1', productName: 'Laptop Pro (Mock)', userId: 'userA', reviewerName: 'Alice', rating: 5, comment: 'Great laptop!', createdAt: new Date().toISOString(), approved: true },
+            { id: 'rev2', productId: 'prod2', productName: 'Wireless Mouse (Mock)', userId: 'userB', reviewerName: 'Bob', rating: 3, comment: 'Okay, but disconnects.', createdAt: new Date(Date.now()-86400000).toISOString(), approved: false },
+        ], totalCount: 2 } };
     }
     if (name === 'reviews-updateReviewCF') return { data: { success: true, review: { ...payload.updateData, id: payload.reviewId, productId: payload.productId } } };
     if (name === 'reviews-deleteReviewCF') return { data: { success: true, message: 'Review deleted (mock)' } };
     return { data: { success: false, error: 'Unknown mock review function' } };
 };
 
-const formatDate = (dateInput: any) => new Date(dateInput?.toDate ? dateInput.toDate() : dateInput).toLocaleDateString();
+const formatDate = (dateInput: any): string => new Date(dateInput?.toDate ? dateInput.toDate() : dateInput).toLocaleDateString();
 
 const AdminReviews = () => {
   const [reviews, setReviews] = useState<ProductReviewBE[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'all' | 'approved' | 'pending'>('all');
   const [reviewToDelete, setReviewToDelete] = useState<ProductReviewBE | null>(null);
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   const fetchReviews = useCallback(async () => {
     setIsLoading(true);
-    let options: GetReviewsAdminOptionsBE = { sortBy: 'createdAt', sortOrder: 'desc' };
+    const options: GetReviewsAdminOptionsBE = { sortBy: 'createdAt', sortOrder: 'desc' };
     if (filterStatus === 'approved') options.approved = true;
-    if (filterStatus === 'pending') options.approved = false;
+    else if (filterStatus === 'pending') options.approved = false;
+    // else if filterStatus is 'all', options.approved remains undefined, fetching all.
 
     try {
-      const result = getReviewsAdminCF ? await getReviewsAdminCF(options) : await callReviewFunctionMock('reviews-getReviewsAdminCF', options);
+      const fn = getReviewsAdminCF || ((opts?: GetReviewsAdminOptionsBE) => fallbackReviewCall('reviews-getReviewsAdminCF', opts));
+      const result = await fn(options);
       if (result.data.success && result.data.reviews) {
         setReviews(result.data.reviews);
-      } else { toast.error(result.data.error || 'Failed to load reviews'); }
-    } catch (e:any) { toast.error(\`Failed to load reviews: ${e.message}\`); }
+      } else { toast.error(result.data.error || 'Failed to load reviews'); setReviews([]); }
+    } catch (e:any) { toast.error(\`Failed to load reviews: ${e.message}\`); setReviews([]); }
     setIsLoading(false);
   }, [filterStatus]);
 
   useEffect(() => { fetchReviews(); }, [fetchReviews]);
 
   const handleApproveReview = async (review: ProductReviewBE) => {
-    if (!updateReviewAdminCF) { toast.error("Function not ready."); return; }
+    setIsProcessingAction(true);
+    const fn = updateReviewAdminCF || ((payload) => fallbackReviewCall('reviews-updateReviewCF', payload));
     try {
-      const result = await updateReviewAdminCF({ productId: review.productId, reviewId: review.id, updateData: { approved: true } });
-      if (result.data.success) {
-        toast.success('Review approved!'); fetchReviews();
-      } else { toast.error(result.data.error || 'Failed to approve review.'); }
+      const result = await fn({ productId: review.productId, reviewId: review.id, updateData: { approved: true } });
+      if (result.data.success) { toast.success('Review approved!'); fetchReviews(); }
+      else { toast.error(result.data.error || 'Failed to approve review.'); }
     } catch (e:any) { toast.error(\`Error approving review: ${e.message}\`); }
-  };
-
-  const handleRejectReview = async (review: ProductReviewBE) => { // Reject = Delete for now
-    setReviewToDelete(review);
+    setIsProcessingAction(false);
   };
 
   const confirmDeleteReview = async () => {
-    if (!reviewToDelete || !deleteReviewAdminCF) { toast.error("Function not ready or review not selected."); return; }
+    if (!reviewToDelete) return;
+    setIsProcessingAction(true);
+    const fn = deleteReviewAdminCF || ((payload) => fallbackReviewCall('reviews-deleteReviewCF', payload));
     try {
-      const result = await deleteReviewAdminCF({ productId: reviewToDelete.productId, reviewId: reviewToDelete.id });
-      if (result.data.success) {
-        toast.success('Review deleted/rejected!'); fetchReviews();
-      } else { toast.error(result.data.error || 'Failed to delete review.'); }
+      const result = await fn({ productId: reviewToDelete.productId, reviewId: reviewToDelete.id });
+      if (result.data.success) { toast.success('Review deleted/rejected!'); fetchReviews(); }
+      else { toast.error(result.data.error || 'Failed to delete review.'); }
     } catch (e:any) { toast.error(\`Error deleting review: ${e.message}\`); }
     setReviewToDelete(null);
+    setIsProcessingAction(false);
   };
 
   if (isLoading) return <AdminLayout><div className="p-6 text-center"><Loader2 className="h-8 w-8 animate-spin"/> Loading reviews...</div></AdminLayout>;
@@ -110,45 +116,36 @@ const AdminReviews = () => {
                 </SelectContent>
               </Select>
             </div>
-            {reviews.length === 0 ? <p>No reviews match this filter.</p> : (
+            {reviews.length === 0 && !isLoading ? <p className="text-muted-foreground text-center py-4">No reviews match this filter.</p> : (
               <Table>
                 <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>User</TableHead><TableHead>Rating</TableHead><TableHead>Comment</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {reviews.map(review => (
+                <TableBody>{reviews.map(review => (
                     <TableRow key={review.id}>
-                      <TableCell>{(review as any).productName || review.productId}</TableCell>
-                      <TableCell>{review.reviewerName || review.userId}</TableCell>
+                      <TableCell>{(review as any).productName || review.productId.substring(0,10)+'...'}</TableCell>
+                      <TableCell>{review.reviewerName || review.userId.substring(0,10)+'...'}</TableCell>
                       <TableCell>{Array(review.rating).fill('⭐').join('')}</TableCell>
-                      <TableCell className="max-w-xs truncate">{review.comment}</TableCell>
+                      <TableCell className="max-w-xs truncate" title={review.comment}>{review.comment}</TableCell>
                       <TableCell>{formatDate(review.createdAt)}</TableCell>
                       <TableCell><Badge variant={review.approved ? 'default' : 'secondary'}>{review.approved ? 'Approved' : 'Pending'}</Badge></TableCell>
                       <TableCell className="text-right space-x-1">
-                        {!review.approved && <Button size="sm" variant="outline" onClick={() => handleApproveReview(review)}><CheckCircle size={16} className="mr-1"/>Approve</Button>}
-                        <Button size="sm" variant="destructive" onClick={() => handleRejectReview(review)}><XCircle size={16} className="mr-1"/>Reject</Button>
+                        {!review.approved && <Button size="sm" variant="outline" onClick={() => handleApproveReview(review)} disabled={isProcessingAction}>{isProcessingAction && <Loader2 className="mr-1 h-3 w-3 animate-spin"/>}Approve</Button>}
+                        <Button size="sm" variant="destructive" onClick={() => setReviewToDelete(review)} disabled={isProcessingAction}>{isProcessingAction && <Loader2 className="mr-1 h-3 w-3 animate-spin"/>}Reject</Button>
                       </TableCell>
-                    </TableRow>
-                  ))}
+                    </TableRow>))}
                 </TableBody>
-              </Table>
-            )}
+              </Table>)}
           </CardContent>
         </Card>
-        {reviewToDelete && (
-          <Dialog open={!!reviewToDelete} onOpenChange={() => setReviewToDelete(null)}>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Confirm Reject/Delete Review</DialogTitle>
-                <DialogDescription>Are you sure you want to delete this review? This action cannot be undone.</DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setReviewToDelete(null)}>Cancel</Button>
-                <Button variant="destructive" onClick={confirmDeleteReview}>Delete Review</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+        {reviewToDelete && <Dialog open={!!reviewToDelete} onOpenChange={() => setReviewToDelete(null)}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Confirm Reject/Delete Review</DialogTitle><DialogDescription>Delete review: "{reviewToDelete.comment?.substring(0,50)}..."?</DialogDescription></DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReviewToDelete(null)} disabled={isProcessingAction}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDeleteReview} disabled={isProcessingAction}>{isProcessingAction && <Loader2 className="mr-1 h-3 w-3 animate-spin"/>}Delete</Button>
+            </DialogFooter>
+          </DialogContent></Dialog>}
       </div>
     </AdminLayout>
   );
 };
-
 export default AdminReviews;

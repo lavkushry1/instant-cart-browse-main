@@ -58,58 +58,41 @@
 - [🟢] Clear User Cart (SDK Activated)
 
 ## 9. Firebase Cloud Functions (`src/functions/...`)
+All Cloud Function wrappers (`...CF.ts` files) have their SDK calls activated (uncommented internally).
 
 ### 9.1. Offer Functions (`offers.functions.ts`)
-- [🟢] `createOfferCF` (SDK Activated)
-- [🟢] `getOfferByIdCF` (SDK Activated)
-- [🟢] `getAllOffersCF` (SDK Activated)
-- [🟢] `updateOfferCF` (SDK Activated)
-- [🟢] `deleteOfferCF` (SDK Activated)
+- [🟢] All CFs SDK Activated
 
 ### 9.2. Product Functions (`products.functions.ts`)
-- [🟢] `createProductCF` (SDK Activated)
-- [🟢] `getProductByIdCF` (SDK Activated)
-- [🟢] `getAllProductsCF` (SDK Activated)
-- [🟢] `updateProductCF` (SDK Activated)
-- [🟢] `deleteProductCF` (SDK Activated)
+- [🟢] All CFs SDK Activated
 
 ### 9.3. Category Functions (`categories.functions.ts`)
-- [🟢] `createCategoryCF` (SDK Activated)
-- [🟢] `getCategoryCF` (SDK Activated)
-- [🟢] `getAllCategoriesCF` (SDK Activated)
-- [🟢] `updateCategoryCF` (SDK Activated)
-- [🟢] `deleteCategoryCF` (SDK Activated)
+- [🟢] All CFs SDK Activated
 
 ### 9.4. Order Functions (`orders.functions.ts`)
-- [🟢] `createOrderCF` (SDK Activated)
-- [🟢] `getOrderByIdCF` (SDK Activated)
-- [🟢] `getOrdersForUserCF` (SDK Activated)
-- [🟢] `getAllOrdersCF` (renamed to `getAllOrdersAdminCF`) (SDK Activated)
-- [🟢] `updateOrderStatusCF` (SDK Activated)
+- [🟢] All CFs SDK Activated
 
 ### 9.5. User Functions (`users.functions.ts`)
-- [🟢] `onUserCreateAuthTriggerCF` (SDK Activated)
-- [🟢] `onUserDeleteAuthTriggerCF` (SDK Activated)
-- [🟢] `getUserProfileCF` (SDK Activated)
-- [🟢] `updateUserProfileCF` (SDK Activated)
-- [🟢] `updateUserRolesCF` (SDK Activated)
+- [🟢] All CFs SDK Activated (Auth Triggers and Callables)
 
 ### 9.6. Review Functions (`reviews.functions.ts`)
-- [🟢] `createReviewCF` (SDK Activated)
-- [🟢] `getReviewsForProductCF` (SDK Activated)
-- [🟢] `updateReviewCF` (SDK Activated)
-- [🟢] `deleteReviewCF` (SDK Activated)
+- [🟢] All CFs SDK Activated
 
 ### 9.7. Admin Settings Functions (`admin.functions.ts`)
-- [🟢] `getSiteSettingsCF` (SDK Activated)
-- [🟢] `updateSiteSettingsCF` (SDK Activated)
+- [🟢] All CFs SDK Activated
 
 ### 9.8. Cart Functions (`cart.functions.ts`)
-- [🟢] `getUserCartCF` (SDK Activated)
-- [🟢] `setItemInUserCartCF` (SDK Activated)
-- [🟢] `clearUserCartCF` (SDK Activated)
+- [🟢] All CFs SDK Activated
 
 ### 9.9. Main Functions Index (`index.ts`)
-- [🟢] Export all defined functions (SDK Activated)
+- [✅] Export all defined functions
 
-_Status: All Cloud Functions and Backend Services now have their Firebase SDK calls activated (uncommented). The Firebase backend is structurally complete and ready for live Firebase project integration, deployment, and testing._
+## 10. Frontend Admin UI Cloud Function Integration
+- [✅] `Admin/Settings.tsx` (UPI Config & General) - CF calls structured (mock fallback)
+- [✅] `Admin/Products.tsx` & `Admin/ProductForm.tsx` - CF calls structured (mock fallback)
+- [✅] `Admin/Categories.tsx` - CF calls structured (mock fallback)
+- [✅] `Admin/Orders.tsx` - CF calls structured (mock fallback)
+- [✅] `Admin/Customers.tsx` - CF calls structured (mock fallback)
+- [✅] `Admin/Reviews.tsx` - CF calls structured (mock fallback)
+
+_Status: All specified backend service logic and Cloud Function wrappers have their SDK calls activated. Core Admin UI pages are now structurally prepared to use these Cloud Functions, with mock fallbacks in place. The next major step is full Firebase project setup by the user, deployment, and then replacing mock fallbacks with rigorously tested live calls in the frontend._
