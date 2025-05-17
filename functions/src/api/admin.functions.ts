@@ -1,10 +1,10 @@
 // functions/src/api/admin.functions.ts
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import {
   getSiteSettingsBE,
   updateSiteSettingsBE,
-} from '../../../src/services/adminService'; // Adjust path
+} from '../services/adminServiceBE';
 import { SiteSettings } from '../../../src/services/adminService';
 
 const ensureAdmin = (context: functions.https.CallableContext): string => {
@@ -16,23 +16,26 @@ const ensureAdmin = (context: functions.https.CallableContext): string => {
 
 console.log("(Cloud Functions) admin.functions.ts: Initializing with LIVE logic...");
 
-export const getSiteSettingsCF = functions.https.onRequest(async (req, res) => {
-  console.log("(Cloud Function) getSiteSettingsCF called.");
+export const getSiteSettingsCF = functions.https.onCall(async (data, context) => {
+  console.log("(Cloud Function) getSiteSettingsCF (onCall) called.");
+  ensureAdmin(context); // Ensure the caller is an admin
   try {
     const settings = await getSiteSettingsBE();
     if (settings) {
-      const publicSettings = JSON.parse(JSON.stringify(settings));
-      if (publicSettings.paymentGatewayKeys) {
-        // delete publicSettings.paymentGatewayKeys.stripeSecretKey; 
-      }
-      res.status(200).send({ success: true, settings: publicSettings });
+      // Potentially filter sensitive keys before sending to client, though ensureAdmin should protect access
+      // For example, if SiteSettings included more sensitive keys than upiVpa:
+      // const clientSafeSettings = { ...settings };
+      // delete clientSafeSettings.someSensitiveKey;
+      return { success: true, settings: settings };
     } else {
-      res.status(404).send({ success: false, error: 'Site settings not configured.' });
+      // It's okay if settings are not found, client might use defaults or prompt for setup
+      return { success: true, settings: null }; // Or return an empty object / specific status
     }
   } catch (error: unknown) {
-    console.error("Error in getSiteSettingsCF:", error);
+    console.error("Error in getSiteSettingsCF (onCall):", error);
+    if (error instanceof functions.https.HttpsError) throw error;
     const message = error instanceof Error ? error.message : 'Failed to get site settings.';
-    res.status(500).send({ success: false, error: message });
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 

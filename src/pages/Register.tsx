@@ -26,6 +26,36 @@ const Register = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const calculatePasswordStrength = (password: string): { strength: 'Weak' | 'Medium' | 'Strong' | 'Very Strong', score: number, color: string } => {
+    let score = 0;
+    if (!password) return { strength: 'Weak', score: 0, color: 'bg-gray-200' };
+
+    // Criteria
+    const lengthCriteria = password.length >= 8;
+    const minLengthMet = password.length >= 6;
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasNumbers = /[0-9]/.test(password);
+    const hasSymbols = /[^A-Za-z0-9]/.test(password);
+
+    if (password.length > 0) score +=1; // Very basic starting point
+    if (minLengthMet) score += 1;
+    if (lengthCriteria) score += 1;
+    if (hasLowerCase) score += 1;
+    if (hasUpperCase) score += 1;
+    if (hasNumbers) score += 1;
+    if (hasSymbols) score += 1;
+    
+    if (password.length < 6) return { strength: 'Weak', score: Math.max(1, score -4), color: 'bg-red-500' }; // Penalize short passwords heavily for score
+
+    if (score < 4) return { strength: 'Weak', score, color: 'bg-red-500' };
+    if (score < 6) return { strength: 'Medium', score, color: 'bg-orange-500' };
+    if (score < 7) return { strength: 'Strong', score, color: 'bg-yellow-500' }; // Adjusted for more granularity
+    return { strength: 'Very Strong', score, color: 'bg-green-500' };
+  };
+  
+  const passwordStrengthDetails = calculatePasswordStrength(formData.password);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
@@ -124,8 +154,25 @@ const Register = () => {
                     onChange={handleChange}
                     required
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Password must be at least 6 characters long
+                  {formData.password && (
+                    <div className="mt-2">
+                      <div className="h-2 w-full bg-gray-200 rounded">
+                        <div
+                          className={`h-full rounded ${passwordStrengthDetails.color}`}
+                          style={{ width: `${(passwordStrengthDetails.score / 7) * 100}%` }} // Max score is 7
+                        ></div>
+                      </div>
+                      <p className={`text-xs mt-1 ${
+                        passwordStrengthDetails.strength === 'Weak' ? 'text-red-500' :
+                        passwordStrengthDetails.strength === 'Medium' ? 'text-orange-500' :
+                        passwordStrengthDetails.strength === 'Strong' ? 'text-yellow-600' : 'text-green-600' // Darker yellow for better readability
+                      }`}>
+                        Strength: {passwordStrengthDetails.strength}
+                      </p>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground pt-1">
+                    Password must be at least 6 characters long. Consider using a mix of uppercase, lowercase, numbers, and symbols for a stronger password.
                   </p>
                 </div>
                 <div className="space-y-2">

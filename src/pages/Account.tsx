@@ -14,11 +14,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { getUserOrders, updateUserPassword, addUserAddress, deleteUserAddress } from '@/services/userService';
+// import { getUserOrders, updateUserPassword, addUserAddress, deleteUserAddress } from '@/services/userService';
 import { useAuth } from '@/hooks/useAuth';
+import { User as AuthUser, UpdateUserProfileData, UserAddress, ClientOrder, ClientOrderItem } from '@/hooks/AuthContextDef'; // Import User type, UpdateUserProfileData, UserAddress, ClientOrder, ClientOrderItem
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { Eye, EyeOff, Plus, Trash2, Check, Clock, X, MapPin, Edit, Package, ShieldCheck, User } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash2, Check, Clock, X, MapPin, Edit, Package, ShieldCheck, User, Loader2, AlertCircle } from 'lucide-react';
 import { 
   Dialog, 
   DialogContent,
@@ -36,28 +37,23 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 
-interface ProfileFormData {
-  name: string;
-  phone: string;
-  address: {
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-  };
+interface ProfileDisplayFormData {
+  displayName: string; // Changed from name to displayName for clarity with User type
+  phoneNumber: string;
+  // currentDisplayAddress is removed as addresses will be managed in their own tab via user.addresses
 }
 
-interface Address {
-  id: string;
-  name: string;
+interface AddressFormData {
+  name?: string; // Label for the address e.g., "Home", "Work"
   street: string;
   city: string;
   state: string;
   zipCode: string;
   country: string;
-  isDefault: boolean;
+  isDefault?: boolean;
+  id?: string; // Add id for editing existing addresses
 }
 
 interface SecurityFormData {
@@ -68,30 +64,36 @@ interface SecurityFormData {
 
 interface Order {
   id: string;
-  date: string;
-  status: string;
-  total: number;
+  date: string; // Mapped from ClientOrder.createdAt
+  status: string; // Mapped from ClientOrder.orderStatus
+  total: number; // Mapped from ClientOrder.grandTotal
   items: {
-    id: string;
-    name: string;
+    id: string; // Mapped from ClientOrderItem.productId
+    name: string; // Mapped from ClientOrderItem.productName
     quantity: number;
-    price: number;
+    price: number; // Mapped from ClientOrderItem.finalUnitPrice
+    image?: string; // Mapped from ClientOrderItem.productImage
   }[];
-  deliveryAddress?: Address;
+  deliveryAddress?: UserAddress; // Mapped from ClientOrder.shippingAddress
   tracking?: {
-    number: string;
-    carrier: string;
-    url?: string;
+    number?: string; // Mapped from ClientOrder.trackingNumber
+    carrier?: string; // Mapped from ClientOrder.shippingCarrier
+    url?: string; // This might not be directly available from ClientOrder, to be reviewed
   };
+  // Additional fields from ClientOrder if needed for display
+  paymentMethod?: string;
+  customerEmail?: string;
 }
 
 const Account = () => {
   const navigate = useNavigate();
-  const { user, updateProfile, logout, isLoading } = useAuth();
+  const { user, updateProfile, logout, isLoading, getUserOrders, addAddress, updateAddress, deleteAddress, setDefaultAddress } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [orders, setOrders] = useState<Order[]>([]);
+  const [isOrdersLoading, setIsOrdersLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [addresses, setAddresses] = useState<Address[]>([]);
+  // Addresses will now come directly from user.addresses from context
+  // const [addresses, setAddresses] = useState<UserAddress[]>([]); 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -99,15 +101,16 @@ const Account = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
   
-  const [addressForm, setAddressForm] = useState<Omit<Address, 'id'>>({
+  const [addressForm, setAddressForm] = useState<AddressFormData>({
     name: '',
     street: '',
     city: '',
     state: '',
     zipCode: '',
-    country: '',
-    isDefault: false
+    country: 'USA', // Default country
+    isDefault: false,
   });
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   
   const [securityForm, setSecurityForm] = useState<SecurityFormData>({
     currentPassword: '',
@@ -115,16 +118,9 @@ const Account = () => {
     confirmPassword: ''
   });
   
-  const [profileForm, setProfileForm] = useState<ProfileFormData>({
-    name: '',
-    phone: '',
-    address: {
-      street: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      country: '',
-    }
+  const [profileDisplayForm, setProfileDisplayForm] = useState<ProfileDisplayFormData>({
+    displayName: '',
+    phoneNumber: '',
   });
 
   // Redirect if not logged in
@@ -137,57 +133,64 @@ const Account = () => {
   // Load user data into form
   useEffect(() => {
     if (user) {
-      setProfileForm({
-        name: user.name || '',
-        phone: user.phone || '',
-        address: user.address || {
-          street: '',
-          city: '',
-          state: '',
-          zipCode: '',
-          country: '',
-        }
+      setProfileDisplayForm({
+        displayName: user.displayName || user.email?.split('@')[0] || '',
+        phoneNumber: user.phoneNumber || '',
       });
 
-      // Load addresses (would come from API in real app)
-      const savedAddresses = localStorage.getItem(`user-addresses-${user.id}`);
-      if (savedAddresses) {
-        setAddresses(JSON.parse(savedAddresses));
-      }
+      // Addresses are now directly from user.addresses, no more localStorage
+      // setAddresses(user.addresses || []); 
 
-      // Fetch orders
+      // Fetch orders when the 'orders' tab is active and user is available
       if (activeTab === 'orders') {
-        const fetchOrders = async () => {
+        const fetchUserOrders = async () => {
+          if (!user || !getUserOrders) return; 
+          setIsOrdersLoading(true);
           try {
-            const userOrders = await getUserOrders(user.id);
-            setOrders(userOrders);
+            const response = await getUserOrders();
+            const mappedOrders: Order[] = response.orders.map((clientOrder: ClientOrder): Order => ({
+              id: clientOrder.id,
+              date: clientOrder.createdAt ? new Date(clientOrder.createdAt).toLocaleDateString() : 'N/A',
+              status: clientOrder.orderStatus,
+              total: clientOrder.grandTotal,
+              items: clientOrder.items.map((item: ClientOrderItem) => ({
+                id: item.productId,
+                name: item.productName,
+                quantity: item.quantity,
+                price: item.finalUnitPrice,
+                image: item.productImage,
+              })),
+              deliveryAddress: clientOrder.shippingAddress,
+              tracking: {
+                number: clientOrder.trackingNumber,
+                carrier: clientOrder.shippingCarrier,
+                // url: clientOrder.trackingUrl // Potential future field
+              },
+              paymentMethod: clientOrder.paymentMethod,
+              customerEmail: clientOrder.customerEmail,
+            }));
+            setOrders(mappedOrders);
+            if (mappedOrders.length === 0) {
+              // toast.success('No orders found yet.'); // Avoid toast if it's just empty state
+            }
           } catch (error) {
             console.error('Error fetching orders:', error);
-            toast.error('Failed to load order history');
+            toast.error('Failed to load order history.');
+          } finally {
+            setIsOrdersLoading(false);
           }
         };
-        fetchOrders();
+        fetchUserOrders();
       }
     }
-  }, [user, activeTab]);
+  }, [user, activeTab, getUserOrders]);
 
-  // Handle form field changes
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle profile display form field changes (displayName, phoneNumber)
+  const handleProfileDisplayFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    
-    if (name.includes('.')) {
-      // Handle nested address fields
-      const [parent, field] = name.split('.');
-      setProfileForm(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent as keyof typeof prev] as object,
-          [field]: value
-        }
-      }));
-    } else {
-      // Handle top-level fields
-      setProfileForm(prev => ({ ...prev, [name]: value }));
+    // Ensure name is a key of ProfileDisplayFormData
+    if (name === 'displayName' || name === 'phoneNumber') {
+      setProfileDisplayForm(prev => ({ ...prev, [name]: value }));
     }
   };
 
@@ -197,28 +200,31 @@ const Account = () => {
     setSecurityForm(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle address form changes
-  const handleAddressFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle address form changes for adding/editing addresses
+  const handleAddressFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setAddressForm(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle address form checkbox change
+  const handleAddressSelectChange = (name: string, value: string) => {
+    setAddressForm(prev => ({ ...prev, [name]: value }));
+  }
+
   const handleDefaultAddressChange = (checked: boolean) => {
     setAddressForm(prev => ({ ...prev, isDefault: checked }));
   };
 
   // Handle profile update
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+  const handleUpdateBaseProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!user) return;
-    
     setIsUpdating(true);
-    
     try {
-      const updatedUser = await updateProfile(user.id, profileForm);
-      
+      const updateData: UpdateUserProfileData = {
+        displayName: profileDisplayForm.displayName,
+        phoneNumber: profileDisplayForm.phoneNumber,
+      };
+      const updatedUser = await updateProfile(updateData);
       if (updatedUser) {
         toast.success('Profile updated successfully');
       }
@@ -247,112 +253,114 @@ const Account = () => {
       return;
     }
     
-    setIsUpdating(true);
-    
+    setIsUpdating(true); // Use a shared loading state or a specific one for password
     try {
-      const success = await updateUserPassword(
-        user.id,
-        securityForm.currentPassword,
-        securityForm.newPassword
-      );
-      
-      if (success) {
-        toast.success('Password updated successfully');
-        setSecurityForm({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        });
-        setShowPasswordForm(false);
-      }
-    } catch (error) {
+      // Assuming updatePassword exists in useAuth() and calls a CF
+      // For now, this is a placeholder as it's not fully implemented in provided AuthProvider code
+      // await updatePassword(securityForm.currentPassword, securityForm.newPassword);
+      // The existing AuthProvider.tsx doesn't have updatePassword. This is future work or relies on Firebase direct methods.
+      toast('Password update functionality to be fully connected with backend.'); 
+      // Placeholder: Simulate success
+      // setShowPasswordForm(false);
+      // setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      // toast.success('Password updated successfully - (Simulated)'); 
+    } catch (error: any) {
       console.error('Error updating password:', error);
-      toast.error('Failed to update password. Check your current password.');
+      toast.error(error.message || 'Failed to update password. Please try again.');
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // Handle adding new address
-  const handleAddAddress = async (e: React.FormEvent) => {
+  // Handle Add/Edit Address Submission
+  const handleSaveAddress = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!user) return;
-    
+    if (!user || !addAddress || !updateAddress) return;
+
+    // Basic validation
+    if (!addressForm.street || !addressForm.city || !addressForm.state || !addressForm.zipCode || !addressForm.country) {
+      toast.error('Please fill in all required address fields.');
+      return;
+    }
+
+    setIsUpdating(true);
     try {
-      // If setting as default, update all other addresses
-      if (addressForm.isDefault) {
-        const updatedAddresses = addresses.map(addr => ({
-          ...addr,
-          isDefault: false
-        }));
-        setAddresses(updatedAddresses);
+      if (editingAddressId) {
+        // Update existing address
+        const addressToUpdate: UserAddress = { 
+          ...addressForm,
+          id: editingAddressId,
+        };
+        await updateAddress(editingAddressId, addressToUpdate);
+        toast.success('Address updated successfully!');
+      } else {
+        // Add new address
+        await addAddress(addressForm);
+        toast.success('Address added successfully!');
       }
-      
-      const newAddress = await addUserAddress(user.id, addressForm);
-      
-      if (newAddress) {
-        // Add to local state
-        setAddresses(prev => [...prev, newAddress]);
-        
-        // Reset form
-        setAddressForm({
-          name: '',
-          street: '',
-          city: '',
-          state: '',
-          zipCode: '',
-          country: '',
-          isDefault: false
-        });
-        
-        setIsAddressFormOpen(false);
-        toast.success('Address added successfully');
-      }
-    } catch (error) {
-      console.error('Error adding address:', error);
-      toast.error('Failed to add address');
+      setIsAddressFormOpen(false);
+      setEditingAddressId(null);
+      setAddressForm({ name: '', street: '', city: '', state: '', zipCode: '', country: 'USA', isDefault: false });
+    } catch (error: any) {
+      console.error('Error saving address:', error);
+      toast.error(error.message || 'Failed to save address.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
-  // Handle removing address
+  // Open address form for editing
+  const handleEditAddress = (address: UserAddress) => {
+    setEditingAddressId(address.id);
+    setAddressForm({ // Pre-fill form with address data
+      id: address.id,
+      name: address.name || '',
+      street: address.street,
+      city: address.city,
+      state: address.state,
+      zipCode: address.zipCode,
+      country: address.country,
+      isDefault: address.isDefault || false,
+    });
+    setIsAddressFormOpen(true);
+  };
+
+  // Open address form for adding new address
+  const openAddNewAddressForm = () => {
+    setEditingAddressId(null);
+    setAddressForm({ name: '', street: '', city: '', state: '', zipCode: '', country: 'USA', isDefault: false });
+    setIsAddressFormOpen(true);
+  };
+
+  // Handle Remove Address
   const handleRemoveAddress = async (addressId: string) => {
-    if (!user) return;
-    
-    try {
-      await deleteUserAddress(user.id, addressId);
-      
-      // Update local state
-      setAddresses(prev => prev.filter(addr => addr.id !== addressId));
-      
-      toast.success('Address removed successfully');
-    } catch (error) {
-      console.error('Error removing address:', error);
-      toast.error('Failed to remove address');
+    if (!user || !deleteAddress) return;
+    if (window.confirm('Are you sure you want to delete this address?')) {
+      setIsUpdating(true);
+      try {
+        await deleteAddress(addressId);
+        toast.success('Address removed successfully!');
+      } catch (error: any) {
+        console.error('Error removing address:', error);
+        toast.error(error.message || 'Failed to remove address.');
+      } finally {
+        setIsUpdating(false);
+      }
     }
   };
-
-  // Handle setting default address
+  
+  // Handle Set Default Address
   const handleSetDefaultAddress = async (addressId: string) => {
-    if (!user) return;
-    
+    if (!user || !setDefaultAddress) return;
+    setIsUpdating(true);
     try {
-      // Update all addresses
-      const updatedAddresses = addresses.map(addr => ({
-        ...addr,
-        isDefault: addr.id === addressId
-      }));
-      
-      // Save updates
-      localStorage.setItem(`user-addresses-${user.id}`, JSON.stringify(updatedAddresses));
-      
-      // Update local state
-      setAddresses(updatedAddresses);
-      
-      toast.success('Default address updated');
-    } catch (error) {
+      await setDefaultAddress(addressId);
+      toast.success('Default address updated!');
+    } catch (error: any) {
       console.error('Error setting default address:', error);
-      toast.error('Failed to update default address');
+      toast.error(error.message || 'Failed to set default address.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -365,48 +373,32 @@ const Account = () => {
   // Handle logout
   const handleLogout = () => {
     logout();
+    toast.success("Logged out successfully.");
     navigate('/');
-    toast.success('You have been logged out');
   };
 
-  // Get status badge for orders
-  const getOrderStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return (
-          <Badge className="bg-green-100 text-green-800 border-green-200">
-            <Check className="w-3 h-3 mr-1" /> Completed
-          </Badge>
-        );
+  const getOrderStatusBadgeDetails = (status: string): { text: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: JSX.Element } => {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return { text: 'Pending', variant: 'outline', icon: <Clock className="mr-1 h-3 w-3" /> };
       case 'processing':
-        return (
-          <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-            <Clock className="w-3 h-3 mr-1" /> Processing
-          </Badge>
-        );
-      case 'cancelled':
-        return (
-          <Badge className="bg-red-100 text-red-800 border-red-200">
-            <X className="w-3 h-3 mr-1" /> Cancelled
-          </Badge>
-        );
+        return { text: 'Processing', variant: 'default', icon: <Loader2 className="mr-1 h-3 w-3 animate-spin" /> };
       case 'shipped':
-        return (
-          <Badge className="bg-purple-100 text-purple-800 border-purple-200">
-            <Package className="w-3 h-3 mr-1" /> Shipped
-          </Badge>
-        );
+        return { text: 'Shipped', variant: 'default', icon: <Package className="mr-1 h-3 w-3" /> };
+      case 'delivered':
+        return { text: 'Delivered', variant: 'secondary', icon: <Check className="mr-1 h-3 w-3" /> };
+      case 'cancelled':
+        return { text: 'Cancelled', variant: 'destructive', icon: <X className="mr-1 h-3 w-3" /> };
+      case 'paymentfailed':
+        return { text: 'Payment Failed', variant: 'destructive', icon: <AlertCircle className="mr-1 h-3 w-3" /> };
       default:
-        return (
-          <Badge className="bg-gray-100 text-gray-800 border-gray-200">
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-          </Badge>
-        );
+        return { text: status || 'Unknown', variant: 'outline', icon: <Clock className="mr-1 h-3 w-3" /> };
     }
   };
 
   // Generate avatar fallback from name
-  const getInitials = (name: string) => {
+  const getInitials = (name?: string | null) => {
+    if (!name) return 'U';
     return name
       .split(' ')
       .map(n => n[0])
@@ -445,594 +437,438 @@ const Account = () => {
   return (
     <>
       <Header />
-      <main className="container py-10">
-        <div className="flex flex-col items-center justify-center space-y-4 mb-8">
-          <Avatar className="h-20 w-20">
-            <AvatarFallback className="text-xl">
-              {getInitials(user.name)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="text-center">
-            <h1 className="text-2xl font-bold">{user.name}</h1>
-            <p className="text-muted-foreground">{user.email}</p>
-          </div>
-          <Button variant="outline" onClick={handleLogout}>
-            Sign Out
-          </Button>
-        </div>
-        
-        <Tabs 
-          defaultValue="profile" 
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="max-w-3xl mx-auto"
-        >
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="profile" className="flex items-center justify-center">
-              <User className="h-4 w-4 mr-2" /> Profile
-            </TabsTrigger>
-            <TabsTrigger value="addresses" className="flex items-center justify-center">
-              <MapPin className="h-4 w-4 mr-2" /> Addresses
-            </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center justify-center">
-              <ShieldCheck className="h-4 w-4 mr-2" /> Security
-            </TabsTrigger>
-            <TabsTrigger value="orders" className="flex items-center justify-center">
-              <Package className="h-4 w-4 mr-2" /> Orders
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="profile" className="space-y-4 mt-4">
+      <main className="container py-10 min-h-[calc(100vh-12rem)]">
+        <div className="grid md:grid-cols-4 gap-10">
+          <div className="md:col-span-1">
             <Card>
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>
-                  Update your personal details here
-                </CardDescription>
-              </CardHeader>
-              <form onSubmit={handleUpdateProfile}>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={profileForm.name}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={user.email}
-                      disabled
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Email address cannot be changed
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      value={profileForm.phone}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </CardContent>
-                
-                <CardHeader className="pt-2">
-                  <CardTitle>Primary Address</CardTitle>
-                  <CardDescription>
-                    Update your default shipping and billing address
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="address.street">Street Address</Label>
-                    <Input
-                      id="address.street"
-                      name="address.street"
-                      value={profileForm.address.street}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="address.city">City</Label>
-                      <Input
-                        id="address.city"
-                        name="address.city"
-                        value={profileForm.address.city}
-                        onChange={handleChange}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="address.state">State/Province</Label>
-                      <Input
-                        id="address.state"
-                        name="address.state"
-                        value={profileForm.address.state}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="address.zipCode">ZIP/Postal Code</Label>
-                      <Input
-                        id="address.zipCode"
-                        name="address.zipCode"
-                        value={profileForm.address.zipCode}
-                        onChange={handleChange}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="address.country">Country</Label>
-                      <Input
-                        id="address.country"
-                        name="address.country"
-                        value={profileForm.address.country}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button 
-                    type="submit" 
-                    disabled={isUpdating}
-                    className="ml-auto"
-                  >
-                    {isUpdating ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </CardFooter>
-              </form>
-            </Card>
-          </TabsContent>
-
-          {/* Addresses Tab */}
-          <TabsContent value="addresses" className="mt-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Address Book</CardTitle>
-                  <CardDescription>
-                    Manage your shipping and billing addresses
-                  </CardDescription>
-                </div>
-                <Button onClick={() => setIsAddressFormOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add New Address
-                </Button>
+              <CardHeader className="text-center">
+                <Avatar className="h-20 w-20 mx-auto mb-2">
+                  <AvatarFallback className="text-xl">
+                    {getInitials(user.displayName)}
+                  </AvatarFallback>
+                </Avatar>
+                <CardTitle>{user.displayName}</CardTitle>
+                <CardDescription>{user.email}</CardDescription>
               </CardHeader>
               <CardContent>
-                {addresses.length > 0 ? (
-                  <div className="space-y-4">
-                    {addresses.map(address => (
-                      <Card key={address.id} className="relative">
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">{address.name}</CardTitle>
-                            {address.isDefault && (
-                              <Badge className="bg-green-100 text-green-800 border-green-200">
-                                Default
-                              </Badge>
-                            )}
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pb-2">
-                          <p>{address.street}</p>
-                          <p>{address.city}, {address.state} {address.zipCode}</p>
-                          <p>{address.country}</p>
-                        </CardContent>
-                        <CardFooter className="flex justify-between">
+                <TabsList className="flex flex-col h-auto">
+                  <TabsTrigger value="profile" className="w-full justify-start">Profile</TabsTrigger>
+                  <TabsTrigger value="addresses" className="w-full justify-start">Addresses</TabsTrigger>
+                  <TabsTrigger value="orders" className="w-full justify-start">Order History</TabsTrigger>
+                  <TabsTrigger value="security" className="w-full justify-start">Security</TabsTrigger>
+                  {/* <TabsTrigger value="preferences" className="w-full justify-start">Preferences</TabsTrigger> */}
+                </TabsList>
+              </CardContent>
+              <CardFooter>
+                  <Button variant="outline" onClick={handleLogout} className="w-full">Logout</Button>
+              </CardFooter>
+            </Card>
+          </div>
+
+          <div className="md:col-span-3">
+            <Tabs defaultValue="profile" value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsContent value="profile">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Personal Information</CardTitle>
+                    <CardDescription>Update your name and phone number.</CardDescription>
+                  </CardHeader>
+                  <form onSubmit={handleUpdateBaseProfile}>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="displayName">Full Name</Label>
+                        <Input 
+                          id="displayName" 
+                          name="displayName" 
+                          value={profileDisplayForm.displayName} 
+                          onChange={handleProfileDisplayFormChange} 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phoneNumber">Phone Number</Label>
+                        <Input 
+                          id="phoneNumber" 
+                          name="phoneNumber" 
+                          type="tel" 
+                          value={profileDisplayForm.phoneNumber} 
+                          onChange={handleProfileDisplayFormChange} 
+                        />
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button type="submit" disabled={isUpdating || isLoading}>
+                        {isUpdating ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                    </CardFooter>
+                  </form>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="addresses">
+                <Card>
+                  <CardHeader>
+                    <div className="flex justify-between items-center">
+                      <CardTitle>Manage Addresses</CardTitle>
+                      <Button onClick={openAddNewAddressForm} disabled={isUpdating || isLoading}>
+                        <Plus className="mr-2 h-4 w-4" /> Add New Address
+                      </Button>
+                    </div>
+                    <CardDescription>View, add, edit, or remove your saved addresses.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {isLoading && <p>Loading addresses...</p>}
+                    {!isLoading && user?.addresses && user.addresses.length === 0 && (
+                      <div className="text-center py-8">
+                        <MapPin className="mx-auto h-12 w-12 text-gray-400" />
+                        <p className="mt-4 text-gray-600">You haven't saved any addresses yet.</p>
+                        <p className="text-sm text-gray-500">Add an address to make checkout faster.</p>
+                        <Button onClick={openAddNewAddressForm} className="mt-4" variant="outline">
+                          Add Your First Address
+                        </Button>
+                      </div>
+                    )}
+                    {!isLoading && user?.addresses && user.addresses.map((address) => (
+                      <Card key={address.id} className="shadow-sm hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-2 flex flex-row justify-between items-start">
                           <div>
-                            {!address.isDefault && (
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleSetDefaultAddress(address.id)}
-                              >
-                                Set as Default
-                              </Button>
-                            )}
-                          </div>
-                          <div>
-                            <Button 
-                              variant="destructive" 
-                              size="sm"
-                              onClick={() => handleRemoveAddress(address.id)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-1" /> Remove
+                            <CardTitle className="text-lg flex items-center">
+                              {address.name || `Address ${user.addresses?.indexOf(address) !== -1 ? (user.addresses?.indexOf(address) || 0) + 1 : ''}`}
+                              {address.isDefault && (
+                                <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">Default</Badge>
+                              )}
+                            </CardTitle>
+                            <CardDescription className="text-sm text-gray-600">
+                              {address.street}, {address.city}, {address.state} {address.zipCode}, {address.country}
+                            </CardDescription>
+                          </div> 
+                          <div className="flex space-x-2 flex-shrink-0">
+                            <Button variant="ghost" size="icon" onClick={() => handleEditAddress(address)} disabled={isUpdating} aria-label="Edit address">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleRemoveAddress(address.id)} disabled={isUpdating} aria-label="Delete address">
+                              <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                           </div>
-                        </CardFooter>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-10 border rounded-md bg-muted/10">
-                    <MapPin className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
-                    <p>No addresses found</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Add a new address to your address book.
-                    </p>
-                    <Button onClick={() => setIsAddressFormOpen(true)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Address
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Security Tab */}
-          <TabsContent value="security" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>
-                  Manage your password and security preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!showPasswordForm ? (
-                  <div className="flex justify-between items-center p-4 border rounded-md">
-                    <div>
-                      <h3 className="font-medium">Password</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Update your password to enhance account security
-                      </p>
-                    </div>
-                    <Button variant="outline" onClick={() => setShowPasswordForm(true)}>
-                      Change Password
-                    </Button>
-                  </div>
-                ) : (
-                  <form onSubmit={handleUpdatePassword} className="space-y-4 border rounded-md p-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="currentPassword">Current Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="currentPassword"
-                          name="currentPassword"
-                          type={showCurrentPassword ? "text" : "password"}
-                          value={securityForm.currentPassword}
-                          onChange={handleSecurityFormChange}
-                          className="pr-10"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-0 top-0 h-full aspect-square"
-                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                        >
-                          {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">New Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="newPassword"
-                          name="newPassword"
-                          type={showNewPassword ? "text" : "password"}
-                          value={securityForm.newPassword}
-                          onChange={handleSecurityFormChange}
-                          className="pr-10"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-0 top-0 h-full aspect-square"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                        >
-                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Password must be at least 6 characters long
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                      <Input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type="password"
-                        value={securityForm.confirmPassword}
-                        onChange={handleSecurityFormChange}
-                      />
-                    </div>
-                    <div className="flex justify-between">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => {
-                          setShowPasswordForm(false);
-                          setSecurityForm({
-                            currentPassword: '',
-                            newPassword: '',
-                            confirmPassword: ''
-                          });
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button 
-                        type="submit" 
-                        disabled={isUpdating || !securityForm.currentPassword || !securityForm.newPassword || !securityForm.confirmPassword}
-                      >
-                        {isUpdating ? 'Updating...' : 'Update Password'}
-                      </Button>
-                    </div>
-                  </form>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          {/* Orders Tab */}
-          <TabsContent value="orders" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Order History</CardTitle>
-                <CardDescription>
-                  View your recent orders and their status
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {orders.length > 0 ? (
-                  <div className="space-y-4">
-                    {orders.map(order => (
-                      <Card key={order.id}>
-                        <CardHeader className="pb-2">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-sm text-muted-foreground">Order #{order.id}</p>
-                              <p className="text-sm">
-                                {new Date(order.date).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div>
-                              {getOrderStatusBadge(order.status)}
-                            </div>
-                          </div>
                         </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2">
-                            {order.items.slice(0, 2).map(item => (
-                              <div key={item.id} className="flex justify-between py-1 border-b last:border-0">
-                                <div>
-                                  <p>{item.name}</p>
-                                  <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
-                                </div>
-                                <p>${item.price.toFixed(2)}</p>
-                              </div>
-                            ))}
-                            {order.items.length > 2 && (
-                              <p className="text-sm text-muted-foreground text-center">
-                                + {order.items.length - 2} more items
-                              </p>
-                            )}
-                          </div>
-                        </CardContent>
-                        <CardFooter className="pt-0 justify-between">
-                          <Button variant="outline" size="sm" onClick={() => handleViewOrderDetails(order)}>
-                            View Details
-                          </Button>
-                          <p className="font-medium">Total: ${order.total.toFixed(2)}</p>
+                        <CardFooter className="pt-2">
+                          {!address.isDefault && (
+                            <Button 
+                              variant="link" 
+                              className="p-0 h-auto text-blue-600 hover:text-blue-800"
+                              onClick={() => handleSetDefaultAddress(address.id)} 
+                              disabled={isUpdating}
+                            >
+                              Set as Default
+                            </Button>
+                          )}
                         </CardFooter>
                       </Card>
                     ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-10 border rounded-md bg-muted/10">
-                    <Package className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
-                    <p>No orders found</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Start shopping to see your order history
-                    </p>
-                    <Button variant="outline" onClick={() => navigate('/products')}>
-                      Start Shopping
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="orders">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Order History</CardTitle>
+                    <CardDescription>View your past orders and their status.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isOrdersLoading ? (
+                      <div className="flex justify-center items-center py-10">
+                        <Loader2 className="h-8 w-8 animate-spin mr-2" />
+                        <p>Loading your orders...</p>
+                      </div>
+                    ) : orders.length > 0 ? (
+                      <div className="space-y-4">
+                        {orders.map(order => (
+                          <Card key={order.id} onClick={() => handleViewOrderDetails(order)} className="cursor-pointer hover:shadow-lg transition-shadow">
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center justify-between">
+                                <CardTitle className="text-lg">Order #{order.id.substring(0, 8)}...</CardTitle>
+                                {
+                                  (() => {
+                                    const badgeDetails = getOrderStatusBadgeDetails(order.status);
+                                    return (
+                                      <Badge variant={badgeDetails.variant} className="text-xs px-2 py-0.5">
+                                        {badgeDetails.icon}
+                                        {badgeDetails.text}
+                                      </Badge>
+                                    );
+                                  })()
+                                }
+                              </div>
+                              <CardDescription>Date: {order.date} | Total: ${order.total.toFixed(2)}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-sm text-muted-foreground">Items: {order.items.length}</p>
+                              {/* Optionally show a few item names or images here later */}
+                            </CardContent>
+                            <CardFooter>
+                              <Button variant="outline" size="sm">View Details</Button>
+                            </CardFooter>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-10">
+                        <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">You have no past orders.</p>
+                        <Button variant="link" className="mt-2" onClick={() => navigate('/')}>Start Shopping</Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="security">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Security Settings</CardTitle>
+                    <CardDescription>Change your password.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <form onSubmit={handleUpdatePassword} className="space-y-4">
+                      <div>
+                        <Label htmlFor="currentPassword">Current Password</Label>
+                        <div className="relative">
+                          <Input id="currentPassword" name="currentPassword" type={showCurrentPassword ? "text" : "password"} value={securityForm.currentPassword} onChange={handleSecurityFormChange} />
+                          <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
+                            {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="newPassword">New Password</Label>
+                        <div className="relative">
+                          <Input id="newPassword" name="newPassword" type={showNewPassword ? "text" : "password"} value={securityForm.newPassword} onChange={handleSecurityFormChange} />
+                          <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setShowNewPassword(!showNewPassword)}>
+                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                        <Input id="confirmPassword" name="confirmPassword" type="password" value={securityForm.confirmPassword} onChange={handleSecurityFormChange} />
+                      </div>
+                      <Button type="submit" disabled={isUpdating || isLoading}>
+                        {isUpdating ? 'Updating Password...' : 'Update Password'}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
       </main>
       <Footer />
 
-      {/* Address Form Dialog */}
-      <Dialog open={isAddressFormOpen} onOpenChange={setIsAddressFormOpen}>
-        <DialogContent>
+      {/* Order Details Dialog */}
+      {selectedOrder && (() => {
+          const effectiveDialogTitle = selectedOrder.id ? `Order Details - #${selectedOrder.id.substring(0,8)}...` : 'Order Details';
+          
+          let orderStatusDescriptionNode = null;
+          if (selectedOrder) { // Check selectedOrder again for type safety inside this block
+            const badgeDetails = getOrderStatusBadgeDetails(selectedOrder.status || 'Pending');
+            orderStatusDescriptionNode = (
+              <span>
+                {`Placed on ${selectedOrder.date} | Status: `}
+                <Badge variant={badgeDetails.variant} className="ml-1 text-xs px-2 py-0.5">
+                  {badgeDetails.icon}
+                  {badgeDetails.text}
+                </Badge>
+              </span>
+            );
+          }
+
+          return (
+            <Dialog open={isOrderDetailsOpen} onOpenChange={setIsOrderDetailsOpen}>
+              <DialogContent className="sm:max-w-[600px] md:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{effectiveDialogTitle}</DialogTitle>
+                  {orderStatusDescriptionNode && (
+                    <DialogDescription>
+                      {orderStatusDescriptionNode}
+                    </DialogDescription>
+                  )}
+                </DialogHeader>
+
+                {selectedOrder && (
+                  <div className="space-y-6">
+                    {/* Items Summary */}
+                    <Card>
+                      <CardHeader><CardTitle>Items in this Order ({selectedOrder.items.length})</CardTitle></CardHeader>
+                      <CardContent className="divide-y divide-gray-200">
+                        {selectedOrder.items.map((item) => (
+                          <div key={item.id} className="flex items-center py-4 space-x-4">
+                            <img 
+                              src={item.image || '/placeholder.svg'} 
+                              alt={item.name} 
+                              className="w-20 h-20 object-cover rounded-md border"
+                            />
+                            <div className="flex-grow">
+                              <p className="font-semibold">{item.name}</p>
+                              <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold">${(item.price * item.quantity).toFixed(2)}</p>
+                              <p className="text-sm text-gray-500">${item.price.toFixed(2)} each</p>
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                      <CardFooter className="justify-end font-bold text-lg">
+                        Total: ${selectedOrder.total.toFixed(2)}
+                      </CardFooter>
+                    </Card>
+
+                    {/* Delivery & Payment Info */}
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <Card>
+                        <CardHeader><CardTitle className="flex items-center"><MapPin className="mr-2 h-5 w-5 text-blue-500"/>Delivery Address</CardTitle></CardHeader>
+                        {selectedOrder.deliveryAddress ? (
+                          <CardContent>
+                            <p className="font-medium">{selectedOrder.deliveryAddress.name || 'N/A'}</p>
+                            <p>{selectedOrder.deliveryAddress.street}</p>
+                            <p>{selectedOrder.deliveryAddress.city}, {selectedOrder.deliveryAddress.state} {selectedOrder.deliveryAddress.zipCode}</p>
+                            <p>{selectedOrder.deliveryAddress.country}</p>
+                          </CardContent>
+                        ) : <CardContent><p>No delivery address provided.</p></CardContent>}
+                      </Card>
+                      <Card>
+                        <CardHeader><CardTitle className="flex items-center"><ShieldCheck className="mr-2 h-5 w-5 text-green-500"/>Payment & Tracking</CardTitle></CardHeader>
+                        <CardContent>
+                          <p><strong>Method:</strong> {selectedOrder.paymentMethod || 'N/A'}</p>
+                          <p><strong>Tracking:</strong> {selectedOrder.tracking?.number || 'Not available'}</p>
+                          <p><strong>Carrier:</strong> {selectedOrder.tracking?.carrier || 'N/A'}</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsOrderDetailsOpen(false)}>Close</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          );
+        })()}
+
+      {/* Add/Edit Address Dialog */}
+      <Dialog open={isAddressFormOpen} onOpenChange={(isOpen) => {
+        setIsAddressFormOpen(isOpen);
+        if (!isOpen) {
+          setEditingAddressId(null); // Reset editing state when dialog closes
+          setAddressForm({ name: '', street: '', city: '', state: '', zipCode: '', country: 'USA', isDefault: false });
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add New Address</DialogTitle>
+            <DialogTitle>{editingAddressId ? 'Edit Address' : 'Add New Address'}</DialogTitle>
             <DialogDescription>
-              Add a new shipping or billing address to your account
+              {editingAddressId ? 'Update your existing address details.' : 'Enter the details for your new address.'}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleAddAddress}>
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">Address Name</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  placeholder="Home, Work, etc."
-                  value={addressForm.name}
-                  onChange={handleAddressFormChange}
-                  required
+          <form onSubmit={handleSaveAddress} className="space-y-4 py-4">
+            <div className="space-y-1">
+              <Label htmlFor="address-name">Address Label (e.g., Home, Work)</Label>
+              <Input 
+                id="address-name" 
+                name="name" 
+                value={addressForm.name} 
+                onChange={handleAddressFormChange} 
+                placeholder="My Home Address"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="address-street">Street Address *</Label>
+              <Input 
+                id="address-street" 
+                name="street" 
+                value={addressForm.street} 
+                onChange={handleAddressFormChange} 
+                required 
+                placeholder="123 Main St"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="address-city">City *</Label>
+                <Input 
+                  id="address-city" 
+                  name="city" 
+                  value={addressForm.city} 
+                  onChange={handleAddressFormChange} 
+                  required 
+                  placeholder="Anytown"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="street">Street Address</Label>
-                <Input
-                  id="street"
-                  name="street"
-                  placeholder="123 Main St, Apt 4B"
-                  value={addressForm.street}
-                  onChange={handleAddressFormChange}
-                  required
+              <div className="space-y-1">
+                <Label htmlFor="address-state">State/Province *</Label>
+                <Input 
+                  id="address-state" 
+                  name="state" 
+                  value={addressForm.state} 
+                  onChange={handleAddressFormChange} 
+                  required 
+                  placeholder="CA"
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    name="city"
-                    placeholder="New York"
-                    value={addressForm.city}
-                    onChange={handleAddressFormChange}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="state">State/Province</Label>
-                  <Input
-                    id="state"
-                    name="state"
-                    placeholder="NY"
-                    value={addressForm.state}
-                    onChange={handleAddressFormChange}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="zipCode">ZIP/Postal Code</Label>
-                  <Input
-                    id="zipCode"
-                    name="zipCode"
-                    placeholder="10001"
-                    value={addressForm.zipCode}
-                    onChange={handleAddressFormChange}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
-                  <Select
-                    value={addressForm.country}
-                    onValueChange={(value) => setAddressForm(prev => ({ ...prev, country: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select country" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USA">United States</SelectItem>
-                      <SelectItem value="CAN">Canada</SelectItem>
-                      <SelectItem value="UK">United Kingdom</SelectItem>
-                      <SelectItem value="AUS">Australia</SelectItem>
-                      <SelectItem value="IND">India</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2 pt-2">
-                <Switch
-                  id="isDefault"
-                  checked={addressForm.isDefault}
-                  onCheckedChange={handleDefaultAddressChange}
-                />
-                <Label htmlFor="isDefault">Set as default address</Label>
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsAddressFormOpen(false)}>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="address-zipCode">ZIP/Postal Code *</Label>
+                <Input 
+                  id="address-zipCode" 
+                  name="zipCode" 
+                  value={addressForm.zipCode} 
+                  onChange={handleAddressFormChange} 
+                  required 
+                  placeholder="90210"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="address-country">Country *</Label>
+                {/* Consider using a Select component for countries for better UX */}
+                <Select name="country" value={addressForm.country} onValueChange={(value) => handleAddressSelectChange('country', value)} required>
+                  <SelectTrigger id="address-country">
+                      <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {/* Add more countries as needed */} 
+                      <SelectItem value="USA">United States</SelectItem>
+                      <SelectItem value="CAN">Canada</SelectItem>
+                      <SelectItem value="MEX">Mexico</SelectItem>
+                      <SelectItem value="GBR">United Kingdom</SelectItem>
+                      <SelectItem value="IND">India</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 pt-2">
+              <Switch 
+                id="address-isDefault" 
+                checked={addressForm.isDefault} 
+                onCheckedChange={handleDefaultAddressChange} 
+              />
+              <Label htmlFor="address-isDefault">Set as default address</Label>
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsAddressFormOpen(false)} disabled={isUpdating}>
                 Cancel
               </Button>
-              <Button type="submit">Save Address</Button>
+              <Button type="submit" disabled={isUpdating}>
+                {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {editingAddressId ? 'Save Changes' : 'Add Address'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Order Details Dialog */}
-      {selectedOrder && (
-        <Dialog open={isOrderDetailsOpen} onOpenChange={setIsOrderDetailsOpen}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle className="flex justify-between items-center">
-                <span>Order #{selectedOrder.id}</span>
-                {getOrderStatusBadge(selectedOrder.status)}
-              </DialogTitle>
-              <DialogDescription>
-                {new Date(selectedOrder.date).toLocaleDateString()} at {new Date(selectedOrder.date).toLocaleTimeString()}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="font-medium mb-2">Items</h3>
-                <div className="border rounded-md divide-y">
-                  {selectedOrder.items.map(item => (
-                    <div key={item.id} className="p-3 flex justify-between">
-                      <div>
-                        <p className="font-medium">{item.name}</p>
-                        <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
-                      </div>
-                      <p>${item.price.toFixed(2)}</p>
-                    </div>
-                  ))}
-                  <div className="p-3 flex justify-between font-medium">
-                    <p>Total</p>
-                    <p>${selectedOrder.total.toFixed(2)}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-6">
-                {selectedOrder.deliveryAddress && (
-                  <div>
-                    <h3 className="font-medium mb-2">Delivery Address</h3>
-                    <div className="border rounded-md p-3">
-                      <p>{selectedOrder.deliveryAddress.name}</p>
-                      <p>{selectedOrder.deliveryAddress.street}</p>
-                      <p>{selectedOrder.deliveryAddress.city}, {selectedOrder.deliveryAddress.state} {selectedOrder.deliveryAddress.zipCode}</p>
-                      <p>{selectedOrder.deliveryAddress.country}</p>
-                    </div>
-                  </div>
-                )}
-                {selectedOrder.tracking && (
-                  <div>
-                    <h3 className="font-medium mb-2">Tracking Information</h3>
-                    <div className="border rounded-md p-3">
-                      <p>Carrier: {selectedOrder.tracking.carrier}</p>
-                      <p>Tracking Number: {selectedOrder.tracking.number}</p>
-                      {selectedOrder.tracking.url && (
-                        <Button 
-                          variant="outline" 
-                          className="mt-2 w-full"
-                          onClick={() => window.open(selectedOrder.tracking.url, '_blank')}
-                        >
-                          Track Package
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsOrderDetailsOpen(false)}>
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </>
   );
 };

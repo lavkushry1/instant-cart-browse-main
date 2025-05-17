@@ -1,130 +1,165 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import ProductList from '@/components/products/ProductList';
 import ProductFilter, { FilterOptions } from '@/components/products/ProductFilter';
-import { Product } from '@/types/product';
-import { 
-  getAllProducts, 
-  getProductsByCategory, 
-  searchProducts, 
-  getAllCategories, 
-  getAllTags, 
-  getMaxProductPrice,
-  getFilteredProducts 
+import { Product as LocalProduct } from '@/types/product'; // Renamed to avoid conflict
+import {
+  getProducts as fetchServiceProducts, // Renamed to avoid conflict with component name
+  GetAllProductsOptions as ServiceGetAllProductsOptions, 
+  Product as ServiceProduct,
+  ClientDocumentSnapshot // Import ClientDocumentSnapshot
 } from '@/services/productService';
-import { Loader2 } from 'lucide-react';
+import ProductCardSkeleton from '@/components/products/ProductCardSkeleton';
+import { Button } from '@/components/ui/button'; // Import Button for Load More
+import { Loader2 } from 'lucide-react'; // For Load More button loading state
+
+// Helper function to map service product to local client product
+const mapServiceProductToLocalProduct = (serviceProduct: ServiceProduct): LocalProduct => {
+  const compareAtPrice = serviceProduct.originalPrice ?? serviceProduct.price;
+  const discount = serviceProduct.originalPrice && serviceProduct.originalPrice > serviceProduct.price 
+    ? Math.round(((serviceProduct.originalPrice - serviceProduct.price) / serviceProduct.originalPrice) * 100) 
+    : 0;
+
+  return {
+    id: serviceProduct.id,
+    name: serviceProduct.name,
+    description: serviceProduct.description,
+    price: serviceProduct.price,
+    images: serviceProduct.images || [],
+    stock: serviceProduct.stock,
+    tags: serviceProduct.tags || [],
+    compareAtPrice: compareAtPrice,
+    category: serviceProduct.categoryName || serviceProduct.categoryId, 
+    featured: serviceProduct.featured ? 1 : 0, 
+    discount: discount,
+    createdAt: serviceProduct.createdAt ? serviceProduct.createdAt.toDate().toISOString() : new Date().toISOString(),
+    updatedAt: serviceProduct.updatedAt ? serviceProduct.updatedAt.toDate().toISOString() : new Date().toISOString(),
+    // seo: undefined, // Assuming SEO is handled separately
+  };
+};
+
+const PRODUCTS_PER_PAGE = 9; // Number of products to load per page/batch
 
 const Products = () => {
   const [searchParams] = useSearchParams();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [filteredProducts, setFilteredProducts] = useState<LocalProduct[]>([]);
+  const [loading, setLoading] = useState(true); // For initial load and filter changes
+  const [isLoadingMore, setIsLoadingMore] = useState(false); // For "Load More" action
   const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [tags, setTags] = useState<string[]>([]);
-  const [maxPrice, setMaxPrice] = useState(10000);
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false); // To track initial load for skeletons
+  const [lastVisibleDoc, setLastVisibleDoc] = useState<ClientDocumentSnapshot | undefined>(undefined);
+  const [hasNextPage, setHasNextPage] = useState(true);
   
-  const category = searchParams.get('category');
-  const searchQuery = searchParams.get('search');
+  // Mocked or simplified filter options - these would ideally come from backend services
+  const [categories, setCategories] = useState<string[]>([]); // TODO: Fetch from categoryService
+  const [tags, setTags] = useState<string[]>([]); // TODO: Fetch or derive from products
+  const [maxPrice, setMaxPrice] = useState(10000); // TODO: Fetch or derive from products
   
-  // Initial product load
-  useEffect(() => {
-    async function loadProducts() {
-      try {
-        setLoading(true);
-        
-        // Load categories, tags, and max price
-        const [allCategories, allTags, maxProductPrice] = await Promise.all([
-          getAllCategories(),
-          getAllTags(),
-          getMaxProductPrice()
-        ]);
-        
-        setCategories(allCategories);
-        setTags(allTags);
-        setMaxPrice(maxProductPrice);
-        
-        // Load products based on URL parameters
-        let productsData: Product[] = [];
-        
-        if (category) {
-          // Load products by category
-          productsData = await getProductsByCategory(category);
-        } else if (searchQuery) {
-          // Load products matching search query
-          productsData = await searchProducts(searchQuery);
-        } else {
-          // Load all products
-          productsData = await getAllProducts();
-        }
-        
-        setProducts(productsData);
-        setFilteredProducts(productsData);
-        setError(null);
-      } catch (error) {
-        console.error('Error loading products:', error);
-        setError('Failed to load products. Please try again later.');
-      } finally {
-        setLoading(false);
+  const categoryParam = searchParams.get('category');
+  const searchQueryParam = searchParams.get('search');
+  
+  const fetchProductsCallback = useCallback(async (options?: ServiceGetAllProductsOptions, isLoadMore = false) => {
+    if (isLoadMore) {
+      setIsLoadingMore(true);
+    } else {
+      setLoading(true);
+      // Reset products and pagination for a new fetch/filter
+      setFilteredProducts([]); 
+      setLastVisibleDoc(undefined);
+      setHasNextPage(true); // Assume there's a next page until fetch proves otherwise
+    }
+    setError(null);
+
+    try {
+      const fetchOptions: ServiceGetAllProductsOptions = {
+        ...options,
+        isEnabled: true, // Default to enabled
+        limit: PRODUCTS_PER_PAGE,
+      };
+      if (categoryParam && !fetchOptions.categoryId) {
+        fetchOptions.categoryId = categoryParam;
       }
+      if (isLoadMore && lastVisibleDoc) {
+        fetchOptions.startAfter = lastVisibleDoc;
+      }
+
+      const response = await fetchServiceProducts(fetchOptions);
+      let clientProducts = response.products.map(mapServiceProductToLocalProduct);
+      
+      if (searchQueryParam) { // Apply client-side search after fetching
+        const lowerQuery = searchQueryParam.toLowerCase();
+        clientProducts = clientProducts.filter(p => 
+          p.name.toLowerCase().includes(lowerQuery) || 
+          p.description.toLowerCase().includes(lowerQuery) ||
+          (p.tags && p.tags.some(t => t.toLowerCase().includes(lowerQuery)))
+        );
+      }
+      
+      setFilteredProducts(prevProducts => isLoadMore ? [...prevProducts, ...clientProducts] : clientProducts);
+      setLastVisibleDoc(response.lastVisible);
+      setHasNextPage(!!response.lastVisible && response.products.length === PRODUCTS_PER_PAGE);
+
+    } catch (err) {
+      console.error('Error loading products:', err);
+      setError('Failed to load products. Please try again later.');
+    } finally {
+      if (isLoadMore) {
+        setIsLoadingMore(false);
+      } else {
+        setLoading(false);
+        setHasFetchedOnce(true);
+      }
+    }
+  }, [categoryParam, searchQueryParam, lastVisibleDoc]); // Added lastVisibleDoc
+
+  useEffect(() => {
+    // Initial fetch, not loading more, no specific filter options beyond URL params
+    fetchProductsCallback({}); 
+  }, [categoryParam, searchQueryParam]); // Removed fetchProductsCallback from deps, it causes loop. categoryParam and searchQueryParam trigger initial load.
+
+  
+  const handleFilterChange = useCallback(async (filterValues: FilterOptions) => {
+    const options: ServiceGetAllProductsOptions = { isEnabled: true };
+
+    if (filterValues.categories.length > 0) {
+      options.categoryId = filterValues.categories[0]; 
+    }
+    if (filterValues.priceRange) {
+      options.minPrice = filterValues.priceRange[0];
+      options.maxPrice = filterValues.priceRange[1];
     }
     
-    loadProducts();
-  }, [category, searchQuery]);
+    // Fetch with new filters, this is a fresh load, not "load more"
+    // The fetchProductsCallback will handle resetting products and pagination state (lastVisibleDoc etc.)
+    await fetchProductsCallback(options, false);
+
+    // Client-side filtering part is removed from here as fetchProductsCallback now handles 
+    // setting filteredProducts directly after server fetch and applying search query.
+    // If additional client-side filtering beyond search (like tags, onSale, inStock from the form)
+    // is still needed after the paginated fetch, it would need careful re-integration
+    // to operate on the current `filteredProducts` state or be part of the options sent to backend if possible.
+    // For now, simplifying by assuming most filters map to service options or search.
+
+  }, [searchQueryParam, fetchProductsCallback]);
   
-  // Handle filter changes
-  const handleFilterChange = async (filters: FilterOptions) => {
-    try {
-      setLoading(true);
-      
-      // If we have a category from URL, ensure it's included in the filter
-      if (category && !filters.categories.includes(category)) {
-        filters.categories = [...filters.categories, category];
-      }
-      
-      // Apply filters to products
-      const filtered = await getFilteredProducts(filters);
-      setFilteredProducts(filtered);
-    } catch (error) {
-      console.error('Error applying filters:', error);
-    } finally {
-      setLoading(false);
+  const handleLoadMore = () => {
+    if (hasNextPage && !isLoadingMore) {
+      fetchProductsCallback({ categoryId: categoryParam || undefined }, true);
     }
   };
-  
+
   const getTitle = () => {
-    if (category) {
-      return `${category.charAt(0).toUpperCase() + category.slice(1)} Products`;
-    } else if (searchQuery) {
-      return `Search Results: "${searchQuery}"`;
+    if (categoryParam) {
+      return `${categoryParam.charAt(0).toUpperCase() + categoryParam.slice(1)} Products`;
+    } else if (searchQueryParam) {
+      return `Search Results: "${searchQueryParam}"`;
     }
     return 'All Products';
   };
   
   return (
     <Layout>
-      {loading && products.length === 0 ? (
-        <div className="container mx-auto py-16 flex justify-center items-center">
-          <div className="flex flex-col items-center">
-            <Loader2 className="h-12 w-12 animate-spin text-brand-teal" />
-            <p className="mt-4 text-gray-500">Loading products...</p>
-          </div>
-        </div>
-      ) : error ? (
-        <div className="container mx-auto py-16 flex justify-center items-center">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-red-500 mb-2">Oops!</h2>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-brand-teal text-white rounded-md hover:bg-brand-dark"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      ) : (
         <div className="container mx-auto py-8 px-4">
           <h1 className="text-3xl font-bold mb-6">{getTitle()}</h1>
           
@@ -137,7 +172,7 @@ const Products = () => {
                 maxPrice={maxPrice}
                 onFilterChange={handleFilterChange}
                 initialFilters={{
-                  categories: category ? [category] : [],
+                categories: categoryParam ? [categoryParam] : [],
                   tags: [],
                   priceRange: [0, maxPrice],
                   inStock: false,
@@ -148,21 +183,52 @@ const Products = () => {
             
             {/* Product listing */}
             <div className="lg:col-span-3">
-              {loading ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-brand-teal" />
+            {loading && !hasFetchedOnce ? (
+                // Show Skeletons on initial load
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                  {[...Array(6)].map((_, index) => <ProductCardSkeleton key={index} />)}
+                </div>
+            ) : error ? (
+               <div className="text-center">
+                  <h2 className="text-2xl font-bold text-red-500 mb-2">Oops!</h2>
+                  <p className="text-gray-600 mb-4">{error}</p>
+                  <button 
+                    onClick={() => fetchProductsCallback()} // Re-fetch on error
+                    className="px-4 py-2 bg-brand-teal text-white rounded-md hover:bg-brand-dark"
+                  >
+                    Try Again
+                  </button>
+                </div>
+            ) : filteredProducts.length === 0 && !loading ? (
+              <div className="text-center py-10">
+                  <p className="text-xl text-gray-600">No products found matching your criteria.</p>
                 </div>
               ) : (
                 <ProductList 
-                  title={getTitle()}
+                title={getTitle()} // This title might be redundant if h1 is already there
                   products={filteredProducts}
-                  category={category || undefined}
+                category={categoryParam || undefined}
                 />
+              )}
+              {hasNextPage && !loading && (
+                <div className="mt-8 text-center">
+                  <Button 
+                    onClick={handleLoadMore} 
+                    disabled={isLoadingMore}
+                    variant="outline"
+                    size="lg"
+                  >
+                    {isLoadingMore ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
+                    ) : (
+                      'Load More Products'
+                    )}
+                  </Button>
+                </div>
               )}
             </div>
           </div>
         </div>
-      )}
     </Layout>
   );
 };

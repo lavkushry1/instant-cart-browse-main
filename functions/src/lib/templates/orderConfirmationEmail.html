@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 600px;
+            margin: auto;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #5a2d82; /* Theme color */
+            text-align: center;
+        }
+        .order-details th, .order-details td {
+            border-bottom: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .order-details th {
+            background-color: #f9f9f9;
+        }
+        .total-row td {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Thank You for Your Order!</h1>
+        <p>Hi {{CUSTOMER_NAME}},</p>
+        <p>Your order with ID <strong>#{{ORDER_ID}}</strong> has been successfully placed.</p>
+        
+        <h2>Order Summary</h2>
+        <table class="order-details" width="100%" cellspacing="0" cellpadding="0">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ORDER_ITEMS_ROWS}}
+                <!-- Example item row:
+                <tr>
+                    <td>Product Name 1</td>
+                    <td>1</td>
+                    <td>₹1,200.00</td>
+                    <td>₹1,200.00</td>
+                </tr>
+                -->
+            </tbody>
+            <tfoot>
+                <tr class="total-row">
+                    <td colspan="3" style="text-align:right;">Subtotal:</td>
+                    <td>{{ORDER_SUBTOTAL}}</td>
+                </tr>
+                {{APPLIED_OFFERS_SUMMARY}}
+                <!-- Example offer row (if any offer applied):
+                <tr>
+                    <td colspan="3" style="text-align:right;">Discount (Offer Name):</td>
+                    <td>-₹100.00</td>
+                </tr>
+                -->
+                <tr class="total-row">
+                    <td colspan="3" style="text-align:right;">Shipping:</td>
+                    <td>{{ORDER_SHIPPING}}</td>
+                </tr>
+                <tr class="total-row">
+                    <td colspan="3" style="text-align:right;">Tax:</td>
+                    <td>{{ORDER_TAX}}</td>
+                </tr>
+                <tr class="total-row">
+                    <td colspan="3" style="text-align:right;">Grand Total:</td>
+                    <td>{{ORDER_GRAND_TOTAL}}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <h2>Shipping Address</h2>
+        <p>
+            {{SHIPPING_ADDRESS_LINE1}}<br>
+            {{SHIPPING_ADDRESS_LINE2}}<br>
+            {{SHIPPING_ADDRESS_CITY_STATE_ZIP}}<br>
+            {{SHIPPING_ADDRESS_COUNTRY}}
+        </p>
+
+        <p>We'll notify you once your order has shipped. You can view your order details anytime in your account.</p>
+        
+        <div class="footer">
+            <p>&copy; {{CURRENT_YEAR}} Instant Cart. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html> 

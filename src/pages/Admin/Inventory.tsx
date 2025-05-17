@@ -58,6 +58,7 @@ import { v4 as uuidv4 } from 'uuid';
 const AdminInventory = () => {
   // State for inventory items
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
@@ -126,9 +127,11 @@ const AdminInventory = () => {
   };
   
   // Handle purchase order submission
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handlePurchaseOrderSubmit = (values: any) => {
     try {
       // Create purchase order items with subtotal and total calculations
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const orderItems = values.items.map((item: any) => {
         const subtotal = item.quantity * item.unitCost;
         return {
@@ -144,6 +147,7 @@ const AdminInventory = () => {
       });
       
       // Calculate total cost
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const totalCost = orderItems.reduce((sum: number, item: any) => sum + item.total, 0);
       
       // Save purchase order
@@ -175,6 +179,7 @@ const AdminInventory = () => {
   };
   
   // Handle add supplier
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleAddSupplier = (values: any) => {
     try {
       // Save supplier

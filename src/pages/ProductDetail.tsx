@@ -4,12 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ShoppingCart, Heart, ChevronLeft, Star, Check, AlertCircle } from 'lucide-react';
-import { getProductById } from '@/services/productService';
+import { ShoppingCart, Heart, ChevronLeft, Star, Check, AlertCircle, ChevronRight } from 'lucide-react';
+import { getProductByIdBE } from '@/services/productService';
 import { getProductSEO } from '@/services/seoService';
 import { Product } from '@/types/product';
 import { SEO } from '@/types/product';
 import { useCart } from '@/hooks/useCart';
+import { useAuth } from '@/hooks/useAuth';
+import { 
+  getGuestWishlist, 
+  addToGuestWishlist, 
+  removeFromGuestWishlist, 
+  isProductInGuestWishlist 
+} from '@/lib/localStorageUtils';
 import Layout from '@/components/layout/Layout';
 import ProductReviews from '@/components/ProductReviews';
 import SEOComponent from '@/components/SEO';
@@ -18,12 +25,19 @@ const ProductDetail = () => {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { 
+    isAuthenticated, 
+    addToWishlist, 
+    removeFromWishlist, 
+    isProductInWishlist 
+  } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [productSEO, setProductSEO] = useState<SEO | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
+  const [isInGuestWishlistLocal, setIsInGuestWishlistLocal] = useState(false);
   
   useEffect(() => {
     async function loadProduct() {
@@ -31,12 +45,36 @@ const ProductDetail = () => {
       
       try {
         setLoading(true);
-        const [productData, seoData] = await Promise.all([
-          getProductById(productId),
+        const [productDataBE, seoData] = await Promise.all([
+          getProductByIdBE(productId),
           getProductSEO(productId)
         ]);
         
-        setProduct(productData);
+        if (productDataBE) {
+          // Map Backend Product to Client Product type
+          const clientProduct: Product = {
+            ...productDataBE,
+            id: productDataBE.id, // ensure id is passed
+            name: productDataBE.name,
+            description: productDataBE.description,
+            price: productDataBE.price,
+            images: productDataBE.images,
+            stock: productDataBE.stock,
+            tags: productDataBE.tags || [],
+            // Fields causing type error - provide defaults or map from BE type
+            compareAtPrice: productDataBE.originalPrice ?? productDataBE.price, // Map originalPrice or default
+            category: productDataBE.categoryName || productDataBE.categoryId, // Map categoryName or categoryId
+            discount: 0, // Default discount, as it's not in BE product
+            featured: productDataBE.featured ? 1 : 0, // Coerce boolean to number, or default
+            // Convert Timestamps to string representations (e.g., ISO string)
+            createdAt: productDataBE.createdAt && typeof (productDataBE.createdAt as any).toDate === 'function' ? (productDataBE.createdAt as any).toDate().toISOString() : new Date().toISOString(),
+            updatedAt: productDataBE.updatedAt && typeof (productDataBE.updatedAt as any).toDate === 'function' ? (productDataBE.updatedAt as any).toDate().toISOString() : new Date().toISOString(),
+            // seo can remain optional or be mapped if seoData is meant to be part of product object
+          };
+          setProduct(clientProduct);
+        } else {
+          setProduct(null);
+        }
         setProductSEO(seoData);
       } catch (error) {
         console.error('Failed to load product:', error);
@@ -49,6 +87,13 @@ const ProductDetail = () => {
 
     loadProduct();
   }, [productId, navigate]);
+
+  useEffect(() => {
+    if (!isAuthenticated && product) {
+      setIsInGuestWishlistLocal(isProductInGuestWishlist(product.id));
+    }
+    // This effect should also run if the product.id changes or auth state changes.
+  }, [isAuthenticated, product]); // Added product to dependencies
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -69,6 +114,18 @@ const ProductDetail = () => {
   const decrementQuantity = () => {
     if (quantity > 1) {
       setQuantity(prev => prev - 1);
+    }
+  };
+  
+  const handleNextImage = () => {
+    if (product && product.images.length > 0) {
+      setSelectedImage((prevIndex) => (prevIndex + 1) % product.images.length);
+    }
+  };
+
+  const handlePrevImage = () => {
+    if (product && product.images.length > 0) {
+      setSelectedImage((prevIndex) => (prevIndex - 1 + product.images.length) % product.images.length);
     }
   };
   
@@ -107,6 +164,16 @@ const ProductDetail = () => {
     );
   }
   
+  // Determine current wishlist status for the button
+  const currentlyInWishlist = isAuthenticated ? isProductInWishlist(product.id) : isInGuestWishlistLocal;
+  const wishlistButtonText = currentlyInWishlist ? 'Remove from Wishlist' : 'Add to Wishlist';
+  const wishlistButtonClasses = `flex-shrink-0 w-full sm:w-auto border-gray-300 ${
+    currentlyInWishlist 
+      ? 'text-red-500 hover:bg-red-50 border-red-300 hover:border-red-400' 
+      : 'text-gray-700 hover:bg-gray-100'
+  }`;
+  const heartIconClasses = `mr-2 h-5 w-5 ${currentlyInWishlist ? 'fill-red-500' : ''}`;
+
   return (
     <Layout>
       {/* Add SEO component with product data */}
@@ -149,7 +216,7 @@ const ProductDetail = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Product Images */}
           <div className="space-y-4">
-            <div className="relative bg-gray-100 rounded-lg overflow-hidden aspect-square">
+            <div className="relative bg-gray-100 rounded-lg overflow-hidden aspect-square group">
               <img
                 src={product.images[selectedImage]} 
                 alt={product.name}
@@ -160,9 +227,30 @@ const ProductDetail = () => {
                   {product.discount}% OFF
                 </Badge>
               )}
+              {product.images.length > 1 && (
+                <>
+                  <Button 
+                    variant="outline"
+                    size="icon"
+                    className="absolute top-1/2 left-2 -translate-y-1/2 z-10 bg-white/50 hover:bg-white/80 opacity-0 group-hover:opacity-100 transition-opacity rounded-full"
+                    onClick={handlePrevImage}
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    size="icon"
+                    className="absolute top-1/2 right-2 -translate-y-1/2 z-10 bg-white/50 hover:bg-white/80 opacity-0 group-hover:opacity-100 transition-opacity rounded-full"
+                    onClick={handleNextImage}
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </Button>
+                </>
+              )}
             </div>
             
-            {/* Thumbnail images */}
             {product.images.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-2">
                 {product.images.map((image, index) => (
@@ -171,7 +259,8 @@ const ProductDetail = () => {
                     onClick={() => setSelectedImage(index)}
                     className={`w-20 h-20 rounded-md overflow-hidden border-2 ${
                       selectedImage === index ? 'border-brand-teal' : 'border-transparent'
-                    }`}
+                    } focus:outline-none focus:ring-2 focus:ring-brand-teal focus:ring-offset-2`}
+                    aria-label={`View image ${index + 1}`}
                 >
                   <img
                       src={image} 
@@ -250,28 +339,56 @@ const ProductDetail = () => {
               </div>
             </div>
             
-            {/* Action buttons */}
-            <div className="flex space-x-3">
-            <Button
-                className="flex-1"
-              onClick={handleAddToCart}
-                disabled={product.stock <= 0}
-            >
-                <ShoppingCart className="mr-2 h-4 w-4" />
-                Add to Cart
-              </Button>
-              <Button 
-                variant="secondary" 
-                className="flex-1"
-                onClick={handleBuyNow}
-                disabled={product.stock <= 0}
-              >
-                Buy Now
-              </Button>
-              <Button variant="outline" size="icon">
-                <Heart className="h-4 w-4" />
-            </Button>
-            </div>
+            {/* Action Buttons */}
+            {product.stock > 0 && (
+              <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                <Button 
+                  size="lg" 
+                  className="flex-1 bg-brand-teal hover:bg-brand-teal-dark"
+                  onClick={handleAddToCart}
+                >
+                  <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  className="flex-1 border-brand-teal text-brand-teal hover:bg-brand-teal-lightest hover:text-brand-teal-dark"
+                  onClick={handleBuyNow}
+                >
+                  Buy Now
+                </Button>
+                
+                {/* Wishlist Button - Modified for guest functionality */}
+                {product && ( // Ensure product is loaded before rendering button
+                  <Button 
+                    size="lg" 
+                    variant={"outline"}
+                    className={wishlistButtonClasses}
+                    onClick={() => {
+                      if (!product) return; // Should not happen if button is rendered
+                      if (isAuthenticated) {
+                        isProductInWishlist(product.id) 
+                          ? removeFromWishlist(product.id) 
+                          : addToWishlist(product.id);
+                      } else {
+                        // Guest wishlist logic
+                        if (isInGuestWishlistLocal) {
+                          removeFromGuestWishlist(product.id);
+                          setIsInGuestWishlistLocal(false);
+                        } else {
+                          addToGuestWishlist(product.id);
+                          setIsInGuestWishlistLocal(true);
+                        }
+                      }
+                    }}
+                    aria-label={wishlistButtonText}
+                  >
+                    <Heart className={heartIconClasses} /> 
+                    {wishlistButtonText}
+                  </Button>
+                )}
+              </div>
+            )}
             
             {/* Product tags */}
             <div className="flex flex-wrap gap-2">
@@ -291,21 +408,16 @@ const ProductDetail = () => {
         
         {/* Product description and additional info */}
         <Card className="mt-12">
-          <Tabs 
-            defaultValue="description" 
-            value={activeTab} 
-            onValueChange={setActiveTab}
-            className="w-full"
-          >
-            <TabsList className="w-full justify-start border-b rounded-none px-4">
-            <TabsTrigger value="description">Description</TabsTrigger>
-            <TabsTrigger value="specifications">Specifications</TabsTrigger>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-8">
+            <TabsList>
+              <TabsTrigger value="description">Description</TabsTrigger>
+              <TabsTrigger value="specifications">Specifications</TabsTrigger>
               <TabsTrigger value="reviews">Reviews</TabsTrigger>
-          </TabsList>
-            <TabsContent value="description" className="p-6">
+            </TabsList>
+            <TabsContent value="description" className="mt-4 prose max-w-none dark:prose-invert">
               <div dangerouslySetInnerHTML={{ __html: product.description }} />
             </TabsContent>
-            <TabsContent value="specifications" className="p-6">
+            <TabsContent value="specifications" className="mt-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
                 <div className="border-b pb-2">
                   <p className="text-sm text-gray-500">Category</p>
@@ -322,13 +434,15 @@ const ProductDetail = () => {
                 <div className="border-b pb-2">
                   <p className="text-sm text-gray-500">SKU</p>
                   <p className="font-medium">IC-{product.id}</p>
-            </div>
+                </div>
               </div>
-          </TabsContent>
-            <TabsContent value="reviews" className="p-6">
-              <ProductReviews productId={product.id} productName={product.name} />
-          </TabsContent>
-        </Tabs>
+            </TabsContent>
+            <TabsContent value="reviews" className="mt-4">
+              {product && productId && (
+                <ProductReviews productId={productId} productName={product.name} />
+              )}
+            </TabsContent>
+          </Tabs>
         </Card>
       </div>
     </Layout>

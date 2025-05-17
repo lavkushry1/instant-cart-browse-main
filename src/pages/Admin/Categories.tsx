@@ -19,10 +19,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { functionsClient } from '@/lib/firebaseClient';
 import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions';
 
-let getAllCategoriesAdminCF: HttpsCallable<void, HttpsCallableResult<{ success: boolean; categories?: Category[]; error?: string }>> | undefined;
-let createCategoryAdminCF: HttpsCallable<CategoryCreationData, HttpsCallableResult<{ success: boolean; category?: Category; error?: string }>> | undefined;
-let updateCategoryAdminCF: HttpsCallable<{ categoryId: string; updateData: CategoryUpdateData }, HttpsCallableResult<{ success: boolean; category?: Category; error?: string }>> | undefined;
-let deleteCategoryAdminCF: HttpsCallable<{ categoryId: string }, HttpsCallableResult<{ success: boolean; message?: string; error?: string }>> | undefined;
+// Define direct response types for Cloud Functions
+interface GetAllCategoriesAdminResponse { success: boolean; categories?: Category[]; error?: string; }
+interface CreateCategoryAdminResponse { success: boolean; category?: Category; error?: string; }
+interface UpdateCategoryAdminResponse { success: boolean; category?: Category; error?: string; }
+interface DeleteCategoryAdminResponse { success: boolean; message?: string; error?: string; }
+
+let getAllCategoriesAdminCF: HttpsCallable<void, GetAllCategoriesAdminResponse> | undefined;
+let createCategoryAdminCF: HttpsCallable<CategoryCreationData, CreateCategoryAdminResponse> | undefined;
+let updateCategoryAdminCF: HttpsCallable<{ categoryId: string; updateData: CategoryUpdateData }, UpdateCategoryAdminResponse> | undefined;
+let deleteCategoryAdminCF: HttpsCallable<{ categoryId: string }, DeleteCategoryAdminResponse> | undefined;
 
 if (functionsClient && Object.keys(functionsClient).length > 0) {
   try {
@@ -40,6 +46,7 @@ if (functionsClient && Object.keys(functionsClient).length > 0) {
 }
 
 // Fallback mock functions if live ones aren't available
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fallbackCall = async (name: string, payload?: any): Promise<any> => {
     console.warn(`MOCKING FALLBACK Cloud Function call: ${name}`, payload);
     await new Promise(r => setTimeout(r, 300));
@@ -112,9 +119,13 @@ const AdminCategories = () => {
     setIsLoading(true);
     try {
       const fn = getAllCategoriesAdminCF || (() => fallbackCall('getAllCategories'));
-      const result = await fn();
-      if (result.data.success && result.data.categories) setCategories(result.data.categories);
-      else { toast.error(result.data.error || 'Failed to load categories'); setCategories([]); }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: HttpsCallableResult<any> = await fn(); // Explicitly type result
+      const responseData = result.data as GetAllCategoriesAdminResponse; // Assert type of data
+
+      if (responseData.success && responseData.categories) setCategories(responseData.categories);
+      else { toast.error(responseData.error || 'Failed to load categories'); setCategories([]); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e:any) { toast.error('Failed to load categories: ' + e.message); setCategories([]); }
     setIsLoading(false);
   }, []);
@@ -123,28 +134,37 @@ const AdminCategories = () => {
 
   const handleSaveCategory = async (data: CategoryCreationData | CategoryUpdateData, categoryIdToUpdate?: string) => {
     try {
-      let result: HttpsCallableResult<any>;
+      let responseData: CreateCategoryAdminResponse | UpdateCategoryAdminResponse;
       if (categoryIdToUpdate) { // Update
         const fn = updateCategoryAdminCF || ((payload) => fallbackCall('updateCategory', payload));
-        result = await fn({ categoryId: categoryIdToUpdate, updateData: data as CategoryUpdateData });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result: HttpsCallableResult<any> = await fn({ categoryId: categoryIdToUpdate, updateData: data as CategoryUpdateData });
+        responseData = result.data as UpdateCategoryAdminResponse;
       } else { // Create
         const fn = createCategoryAdminCF || ((payload) => fallbackCall('createCategory', payload));
-        result = await fn(data as CategoryCreationData);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result: HttpsCallableResult<any> = await fn(data as CategoryCreationData);
+        responseData = result.data as CreateCategoryAdminResponse;
       }
-      if (result.data.success) {
+      if (responseData.success) {
         toast.success(`Category ${categoryIdToUpdate ? 'updated' : 'created'}!`);
         setIsFormOpen(false); setEditingCategory(null); fetchCategories();
-      } else { toast.error(result.data.error || 'Save failed.'); }
+      } else { toast.error(responseData.error || 'Save failed.'); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e:any) { toast.error('Save error: ' + e.message); }
   };
 
   const handleDeleteCategory = async () => {
     if (!categoryToDelete || !deleteCategoryAdminCF) { toast.error("Delete function unavailable or no category selected."); return; }
     try {
-      const result = await deleteCategoryAdminCF({ categoryId: categoryToDelete.id });
-      if (result.data.success) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: HttpsCallableResult<any> = await deleteCategoryAdminCF({ categoryId: categoryToDelete.id });
+      const responseData = result.data as DeleteCategoryAdminResponse;
+
+      if (responseData.success) {
         toast.success('Category deleted!'); fetchCategories();
-      } else { toast.error(result.data.error || 'Delete failed.'); }
+      } else { toast.error(responseData.error || 'Delete failed.'); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e:any) { toast.error('Delete error: ' + e.message); }
     setCategoryToDelete(null);
   };

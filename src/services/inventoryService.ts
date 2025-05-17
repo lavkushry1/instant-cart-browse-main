@@ -761,13 +761,13 @@ export const markAlertAsRead = (alertId: string): InventoryAlert => {
 export const generateInventoryReport = (
   name: string,
   type: 'stock_levels' | 'inventory_valuation' | 'movement_history' | 'low_stock' | 'slow_moving' | 'inventory_forecast' | 'custom',
-  parameters: Record<string, any>,
+  parameters: Record<string, unknown>,
   userId: string
 ): InventoryReport => {
   const now = new Date().toISOString();
   
   // Generate report data
-  let reportData: any = {};
+  let reportData: InventoryItem[] | InventoryMovement[] | { error: string } | Record<string, unknown> = {};
   
   switch (type) {
     case 'stock_levels':
@@ -779,12 +779,12 @@ export const generateInventoryReport = (
     case 'movement_history':
       reportData = getAllInventoryMovements();
       if (parameters.productId) {
-        reportData = reportData.filter((m: InventoryMovement) => m.productId === parameters.productId);
+        reportData = (reportData as InventoryMovement[]).filter((m: InventoryMovement) => m.productId === parameters.productId as string);
       }
       if (parameters.startDate && parameters.endDate) {
-        reportData = reportData.filter((m: InventoryMovement) => {
+        reportData = (reportData as InventoryMovement[]).filter((m: InventoryMovement) => {
           const movementDate = new Date(m.timestamp);
-          return movementDate >= new Date(parameters.startDate) && movementDate <= new Date(parameters.endDate);
+          return movementDate >= new Date(parameters.startDate as string) && movementDate <= new Date(parameters.endDate as string);
         });
       }
       break;
@@ -829,7 +829,12 @@ export const getProductsStockStatus = (productIds: string[]): Record<string, {
   status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'discontinued'
 }> => {
   const items = getAllInventoryItems();
-  const result: Record<string, any> = {};
+  const result: Record<string, { 
+    inStock: boolean, 
+    quantity: number,
+    availableQuantity: number,
+    status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'discontinued'
+  }> = {};
   
   productIds.forEach(productId => {
     const item = items.find(i => i.productId === productId);

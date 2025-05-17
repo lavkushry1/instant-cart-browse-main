@@ -2,15 +2,7 @@ import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getPageSEO } from '@/services/seoService';
 import { PageSEO } from '@/types/seo';
-
-interface SEOProps {
-  title?: string;
-  description?: string;
-  keywords?: string[];
-  ogImage?: string;
-  canonicalUrl?: string;
-  noindex?: boolean;
-}
+import { SEOProps } from './seoTypes';
 
 const SEO: React.FC<SEOProps> = ({ 
   title, 
@@ -170,4 +162,5 @@ const SEO: React.FC<SEOProps> = ({
   return null;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export default SEO; 

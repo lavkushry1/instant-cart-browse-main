@@ -71,6 +71,7 @@ const CurrencySettings = () => {
     }
   };
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleDisplayOptionChange = (key: keyof CurrencyDisplayOptions, value: any) => {
     const newOptions = {
       ...editDisplayOptions,

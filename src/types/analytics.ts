@@ -203,7 +203,7 @@ export interface DashboardWidget {
     y: number;
   };
   reportId?: string;
-  customConfig?: Record<string, any>;
+  customConfig?: Record<string, unknown>;
 }
 
 export type WidgetType = 

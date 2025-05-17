@@ -1,6 +1,6 @@
 // functions/src/api/categories.functions.ts
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import {
   createCategoryBE,
   getCategoryBE,
@@ -27,10 +27,11 @@ export const createCategoryCF = functions.https.onCall(async (data: CategoryCrea
     }
     const newCategory = await createCategoryBE(data);
     return { success: true, category: newCategory };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in createCategoryCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to create category.');
+    const message = error instanceof Error ? error.message : 'Failed to create category.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
@@ -48,28 +49,46 @@ export const getCategoryCF = functions.https.onRequest(async (req, res) => {
     } else {
       res.status(404).send({ success: false, error: 'Category not found.' });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in getCategoryCF:", error);
-    res.status(500).send({ success: false, error: error.message || 'Failed to get category.' });
+    const message = error instanceof Error ? error.message : 'Failed to get category.';
+    res.status(500).send({ success: false, error: message });
   }
 });
 
-export const getAllCategoriesCF = functions.https.onRequest(async (req, res) => {
-  console.log("(Cloud Function) getAllCategoriesCF called with query:", req.query);
+// export const getAllCategoriesCF = functions.https.onRequest(async (req, res) => {
+//   console.log("(Cloud Function) getAllCategoriesCF called with query:", req.query);
+//   try {
+//     let parentIdQuery = req.query.parentId as string | undefined | null;
+//     if (req.query.parentId === 'null') {
+//         parentIdQuery = null;
+//     } else if (typeof req.query.parentId === 'string') {
+//         parentIdQuery = req.query.parentId;
+//     } else {
+//         parentIdQuery = undefined; // Fetch all if not specified or not 'null'
+//     }
+//     const categories = await getAllCategoriesBE(parentIdQuery);
+//     res.status(200).send({ success: true, categories });
+//   } catch (error: unknown) {
+//     console.error("Error in getAllCategoriesCF:", error);
+//     const message = error instanceof Error ? error.message : 'Failed to get all categories.';
+//     res.status(500).send({ success: false, error: message });
+//   }
+// });
+
+// Rewritten getAllCategoriesCF as a callable function for Admin use
+export const getAllCategoriesCF = functions.https.onCall(async (data, context) => {
+  console.log("(Cloud Function) getAllCategoriesCF (callable) called.");
+  ensureAdmin(context); // Ensure only admins can call this
   try {
-    let parentIdQuery = req.query.parentId as string | undefined | null;
-    if (req.query.parentId === 'null') {
-        parentIdQuery = null;
-    } else if (typeof req.query.parentId === 'string') {
-        parentIdQuery = req.query.parentId;
-    } else {
-        parentIdQuery = undefined; // Fetch all if not specified or not 'null'
-    }
-    const categories = await getAllCategoriesBE(parentIdQuery);
-    res.status(200).send({ success: true, categories });
-  } catch (error: any) {
-    console.error("Error in getAllCategoriesCF:", error);
-    res.status(500).send({ success: false, error: error.message || 'Failed to get all categories.' });
+    // Admin panel typically needs all categories for management and hierarchical display
+    const categories = await getAllCategoriesBE(); // Fetches all categories
+    return { success: true, categories };
+  } catch (error: unknown) {
+    console.error("Error in getAllCategoriesCF (callable):", error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    const message = error instanceof Error ? error.message : 'Failed to get all categories.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
@@ -83,10 +102,11 @@ export const updateCategoryCF = functions.https.onCall(async (data: { categoryId
     }
     const updatedCategory = await updateCategoryBE(categoryId, updateData);
     return { success: true, category: updatedCategory };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in updateCategoryCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to update category.');
+    const message = error instanceof Error ? error.message : 'Failed to update category.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
@@ -100,12 +120,24 @@ export const deleteCategoryCF = functions.https.onCall(async (data: { categoryId
     }
     await deleteCategoryBE(categoryId);
     return { success: true, message: 'Category deleted successfully.' };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in deleteCategoryCF:", error);
-    if (error.message && error.message.includes("products are still associated")) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete category.';
+    
+    // Check for specific error messages from deleteCategoryBE
+    if (error instanceof Error && error.message) {
+      if (error.message.includes("products are still associated")) {
         throw new functions.https.HttpsError('failed-precondition', error.message);
+      }
+      if (error.message.includes("subcategories exist")) {
+        throw new functions.https.HttpsError('failed-precondition', error.message); 
+      }
     }
+    
+    // If it's already an HttpsError from ensureAdmin or argument validation, rethrow it
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to delete category.');
+    
+    // For other generic errors from deleteCategoryBE or unexpected issues
+    throw new functions.https.HttpsError('internal', errorMessage);
   }
 });

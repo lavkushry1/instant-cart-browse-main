@@ -7,16 +7,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, ShoppingBag, CreditCard, Loader2 } from 'lucide-react';
+import { Settings, ShoppingBag, CreditCard, Loader2, Shield } from 'lucide-react';
 import { toast } from 'sonner';
+import AdminCardDetails from '@/components/checkout/AdminCardDetails';
 
 // Firebase Client SDK imports for Cloud Functions
 import { functionsClient } from '@/lib/firebaseClient'; 
 import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions'; 
 import { SiteSettings } from '@/services/adminService'; // Shared type from backend service
 
-let getSiteSettingsFunction: HttpsCallable<void, HttpsCallableResult<{ success: boolean; settings?: SiteSettings; error?: string }>>;
-let updateSiteSettingsFunction: HttpsCallable<Partial<SiteSettings>, HttpsCallableResult<{ success: boolean; settings?: SiteSettings; error?: string }>>;
+// Define the direct response structure from callable functions
+interface SiteSettingsResponse { success: boolean; settings?: SiteSettings; error?: string; message?: string; }
+
+let getSiteSettingsFunction: HttpsCallable<void, SiteSettingsResponse> | undefined;
+let updateSiteSettingsFunction: HttpsCallable<Partial<SiteSettings>, SiteSettingsResponse> | undefined;
 
 if (functionsClient && Object.keys(functionsClient).length > 0) { // Check if functionsClient is not the empty mock
   try {
@@ -34,58 +38,91 @@ if (functionsClient && Object.keys(functionsClient).length > 0) { // Check if fu
 }
 
 // Fallback mock if httpsCallable setup failed or not ready
-const callFallbackMock = async (functionName: string, data?: any): Promise<HttpsCallableResult<{ success: boolean; settings?: any; error?: string; message?: string}>> => {
+const callFallbackMock = async (functionName: string, data?: Partial<SiteSettings>): Promise<SiteSettingsResponse> => {
     console.warn(`Using MOCK for Cloud Function: ${functionName} with data:`, data);
     await new Promise(resolve => setTimeout(resolve, 700)); 
     if (functionName === 'admin-getSiteSettingsCF') {
         const storedSettings = localStorage.getItem('adminSiteSettingsMock'); 
-        if (storedSettings) return { data: { success: true, settings: JSON.parse(storedSettings) } };
-        return { data: { success: true, settings: { storeName: "Default Mock Store", paymentGatewayKeys: { upiVpa: 'default@upi_mock' } } } };
+        if (storedSettings) return { success: true, settings: JSON.parse(storedSettings) };
+        return { success: true, settings: { storeName: "Default Mock Store", paymentGatewayKeys: { upiVpa: 'default@upi_mock' } } };
     }
     if (functionName === 'admin-updateSiteSettingsCF') {
-        const currentSettings = JSON.parse(localStorage.getItem('adminSiteSettingsMock') || '{}');
+        const currentSettingsJSON = localStorage.getItem('adminSiteSettingsMock');
+        const currentSettings = currentSettingsJSON ? JSON.parse(currentSettingsJSON) : {};
         const updatedData = { ...currentSettings, ...data };
         if (data && data.paymentGatewayKeys) {
             updatedData.paymentGatewayKeys = { ...(currentSettings.paymentGatewayKeys || {}), ...data.paymentGatewayKeys };
         }
         localStorage.setItem('adminSiteSettingsMock', JSON.stringify(updatedData));
-        return { data: { success: true, settings: updatedData } };
+        return { success: true, settings: updatedData };
     }
-    return { data: { success: false, error: 'Unknown mock function' } };
+    return { success: false, error: 'Unknown mock function' };
 };
 
 const AdminSettings = () => {
   const [storeName, setStoreName] = useState('');
   const [storeDescription, setStoreDescription] = useState('');
+  const [storeLogoUrl, setStoreLogoUrl] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
+  const [twitterUrl, setTwitterUrl] = useState('');
+  const [primaryThemeColor, setPrimaryThemeColor] = useState('');
+  const [secondaryThemeColor, setSecondaryThemeColor] = useState('');
+  const [themeFontFamily, setThemeFontFamily] = useState('');
+  const [defaultCurrencyCode, setDefaultCurrencyCode] = useState('INR');
+  const [supportedCurrencyCodes, setSupportedCurrencyCodes] = useState('');
+  const [defaultMetaTitle, setDefaultMetaTitle] = useState('');
+  const [defaultMetaDescription, setDefaultMetaDescription] = useState('');
+  const [googleAnalyticsId, setGoogleAnalyticsId] = useState('');
+  const [facebookPixelId, setFacebookPixelId] = useState('');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [upiId, setUpiId] = useState('');
   const [isSavingGeneral, setIsSavingGeneral] = useState(false);
+  const [isSavingStoreInfo, setIsSavingStoreInfo] = useState(false);
   const [isSavingUpi, setIsSavingUpi] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [showStoredCards, setShowStoredCards] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setIsLoadingSettings(true);
     try {
       const result = getSiteSettingsFunction 
-        ? await getSiteSettingsFunction() 
+        ? (await getSiteSettingsFunction()).data
         : await callFallbackMock('admin-getSiteSettingsCF');
 
-      if (result.data.success && result.data.settings) {
-        const settings = result.data.settings as SiteSettings; // Cast to specific type
+      if (result.success && result.settings) {
+        const settings = result.settings as SiteSettings; // Cast to specific type
         setStoreName(settings.storeName || '');
         setStoreDescription(settings.storeDescription || '');
+        setStoreLogoUrl(settings.storeLogoUrl || '');
         setContactEmail(settings.contactEmail || '');
         setContactPhone(settings.contactPhone || '');
+        setFacebookUrl(settings.socialMediaLinks?.facebook || '');
+        setInstagramUrl(settings.socialMediaLinks?.instagram || '');
+        setTwitterUrl(settings.socialMediaLinks?.twitter || '');
+        setPrimaryThemeColor(settings.themePreferences?.primaryColor || '');
+        setSecondaryThemeColor(settings.themePreferences?.secondaryColor || '');
+        setThemeFontFamily(settings.themePreferences?.fontFamily || '');
+        setDefaultCurrencyCode(settings.currency?.defaultCode || 'INR');
+        setSupportedCurrencyCodes(settings.currency?.supportedCodes?.join(', ') || '');
+        setDefaultMetaTitle(settings.seoDefaults?.metaTitle || '');
+        setDefaultMetaDescription(settings.seoDefaults?.metaDescription || '');
+        setGoogleAnalyticsId(settings.trackingIds?.googleAnalyticsId || '');
+        setFacebookPixelId(settings.trackingIds?.facebookPixelId || '');
         setMaintenanceMode(settings.maintenanceMode || false);
         setUpiId(settings.paymentGatewayKeys?.upiVpa || '');
         if(settings.paymentGatewayKeys?.upiVpa) localStorage.setItem('storeUpiId', settings.paymentGatewayKeys.upiVpa);
       } else {
-        toast.error(result.data.error || "Failed to load site settings.");
+        toast.error(result.error || "Failed to load site settings.");
       }
-    } catch (error: any) {
-      toast.error(`Failed to load site settings: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error instanceof Error) {
+        message = error.message;
+      }
+      toast.error(`Failed to load site settings: ${message}`);
       console.error("Error loading settings:", error);
     }
     setIsLoadingSettings(false);
@@ -95,22 +132,102 @@ const AdminSettings = () => {
 
   const handleSaveGeneralSettings = async () => {
     setIsSavingGeneral(true);
-    const settingsToSave: Partial<SiteSettings> = { storeName, storeDescription, contactEmail, contactPhone, maintenanceMode };
+    const settingsToSave: Partial<SiteSettings> = {
+      storeName,
+      storeDescription,
+      storeLogoUrl,
+      contactEmail,
+      contactPhone,
+      socialMediaLinks: {
+        facebook: facebookUrl,
+        instagram: instagramUrl,
+        twitter: twitterUrl,
+      },
+      themePreferences: {
+        primaryColor: primaryThemeColor,
+        secondaryColor: secondaryThemeColor,
+        fontFamily: themeFontFamily,
+      },
+      maintenanceMode
+    };
     try {
       const result = updateSiteSettingsFunction 
-        ? await updateSiteSettingsFunction(settingsToSave) 
+        ? (await updateSiteSettingsFunction(settingsToSave)).data
         : await callFallbackMock('admin-updateSiteSettingsCF', settingsToSave);
 
-      if (result.data.success) {
+      if (result.success) {
         toast.success("General settings saved successfully!");
-        if (result.data.settings) { /* Optionally update state from result */ }
+        if (result.settings) {
+            setStoreName(result.settings.storeName || '');
+            setStoreDescription(result.settings.storeDescription || '');
+            setStoreLogoUrl(result.settings.storeLogoUrl || '');
+            setContactEmail(result.settings.contactEmail || '');
+            setContactPhone(result.settings.contactPhone || '');
+            setFacebookUrl(result.settings.socialMediaLinks?.facebook || '');
+            setInstagramUrl(result.settings.socialMediaLinks?.instagram || '');
+            setTwitterUrl(result.settings.socialMediaLinks?.twitter || '');
+            setPrimaryThemeColor(result.settings.themePreferences?.primaryColor || '');
+            setSecondaryThemeColor(result.settings.themePreferences?.secondaryColor || '');
+            setThemeFontFamily(result.settings.themePreferences?.fontFamily || '');
+            setMaintenanceMode(result.settings.maintenanceMode || false);
+        }
       } else {
-        toast.error(result.data.error || "Failed to save general settings.");
+        toast.error(result.error || "Failed to save general settings.");
       }
-    } catch (error: any) {
-      toast.error(`Failed to save general settings: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error instanceof Error) {
+        message = error.message;
+      }
+      toast.error(`Failed to save general settings: ${message}`);
     }
     setIsSavingGeneral(false);
+  };
+
+  const handleSaveStoreInfoSettings = async () => {
+    setIsSavingStoreInfo(true);
+    const settingsToSave: Partial<SiteSettings> = {
+      currency: { 
+        defaultCode: defaultCurrencyCode.toUpperCase(),
+        supportedCodes: supportedCurrencyCodes.split(',').map(code => code.trim().toUpperCase()).filter(code => code)
+      },
+      seoDefaults: {
+        metaTitle: defaultMetaTitle,
+        metaDescription: defaultMetaDescription,
+      },
+      trackingIds: {
+        googleAnalyticsId: googleAnalyticsId,
+        facebookPixelId: facebookPixelId,
+      }
+    };
+    try {
+      const result = updateSiteSettingsFunction
+        ? (await updateSiteSettingsFunction(settingsToSave)).data
+        : await callFallbackMock('admin-updateSiteSettingsCF', settingsToSave);
+
+      if (result.success) {
+        toast.success("Store info settings saved successfully!");
+        if (result.settings?.currency) {
+            setDefaultCurrencyCode(result.settings.currency.defaultCode);
+            setSupportedCurrencyCodes(result.settings.currency.supportedCodes?.join(', ') || '');
+        }
+        if (result.settings?.seoDefaults) {
+          setDefaultMetaTitle(result.settings.seoDefaults.metaTitle || '');
+          setDefaultMetaDescription(result.settings.seoDefaults.metaDescription || '');
+        }
+        if (result.settings?.trackingIds) {
+          setGoogleAnalyticsId(result.settings.trackingIds.googleAnalyticsId || '');
+          setFacebookPixelId(result.settings.trackingIds.facebookPixelId || '');
+        }
+      } else {
+        toast.error(result.error || "Failed to save store info settings.");
+      }
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error instanceof Error) message = error.message;
+      toast.error(`Failed to save store info settings: ${message}`);
+    }
+    setIsSavingStoreInfo(false);
   };
 
   const handleSavePaymentSettings = async () => {
@@ -119,18 +236,22 @@ const AdminSettings = () => {
     const settingsToUpdate: Partial<SiteSettings> = { paymentGatewayKeys: { upiVpa: upiId.trim() } };
     try {
       const result = updateSiteSettingsFunction 
-        ? await updateSiteSettingsFunction(settingsToUpdate) 
+        ? (await updateSiteSettingsFunction(settingsToUpdate)).data
         : await callFallbackMock('admin-updateSiteSettingsCF', settingsToUpdate);
 
-      if (result.data.success && result.data.settings?.paymentGatewayKeys?.upiVpa) {
+      if (result.success && result.settings?.paymentGatewayKeys?.upiVpa) {
         toast.success("UPI ID saved successfully!");
-        localStorage.setItem('storeUpiId', result.data.settings.paymentGatewayKeys.upiVpa);
-        setUpiId(result.data.settings.paymentGatewayKeys.upiVpa);
+        localStorage.setItem('storeUpiId', result.settings.paymentGatewayKeys.upiVpa);
+        setUpiId(result.settings.paymentGatewayKeys.upiVpa);
       } else {
-        toast.error(result.data.error || "Failed to save UPI ID.");
+        toast.error(result.error || "Failed to save UPI ID.");
       }
-    } catch (error: any) {
-      toast.error(`Failed to save UPI ID: ${error.message || 'Unknown error'}`);
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error instanceof Error) {
+        message = error.message;
+      }
+      toast.error(`Failed to save UPI ID: ${message}`);
       console.error("Error saving UPI ID:", error);
     }
     setIsSavingUpi(false);
@@ -153,9 +274,29 @@ const AdminSettings = () => {
               <CardHeader><CardTitle>General Settings</CardTitle><CardDescription>Manage your store's general settings.</CardDescription></CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2"><Label htmlFor="store-name">Store Name</Label><Input id="store-name" value={storeName} onChange={e => setStoreName(e.target.value)} /></div>
+                <div className="space-y-2"><Label htmlFor="store-logo-url">Store Logo URL</Label><Input id="store-logo-url" type="url" placeholder="https://example.com/logo.png" value={storeLogoUrl} onChange={e => setStoreLogoUrl(e.target.value)} /></div>
                 <div className="space-y-2"><Label htmlFor="store-description">Store Description</Label><Textarea id="store-description" value={storeDescription} onChange={e => setStoreDescription(e.target.value)} /></div>
                 <div className="space-y-2"><Label htmlFor="contact-email">Contact Email</Label><Input id="contact-email" type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} /></div>
                 <div className="space-y-2"><Label htmlFor="contact-phone">Contact Phone</Label><Input id="contact-phone" type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)} /></div>
+                <h4 className="text-md font-medium pt-4 border-t">Social Media Links</h4>
+                <div className="space-y-2"><Label htmlFor="facebook-url">Facebook URL</Label><Input id="facebook-url" type="url" placeholder="https://facebook.com/yourpage" value={facebookUrl} onChange={e => setFacebookUrl(e.target.value)} /></div>
+                <div className="space-y-2"><Label htmlFor="instagram-url">Instagram URL</Label><Input id="instagram-url" type="url" placeholder="https://instagram.com/yourprofile" value={instagramUrl} onChange={e => setInstagramUrl(e.target.value)} /></div>
+                <div className="space-y-2"><Label htmlFor="twitter-url">Twitter URL</Label><Input id="twitter-url" type="url" placeholder="https://twitter.com/yourhandle" value={twitterUrl} onChange={e => setTwitterUrl(e.target.value)} /></div>
+                <h4 className="text-md font-medium pt-4 border-t">Theme Settings</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="primary-color">Primary Color</Label>
+                    <Input id="primary-color" type="text" placeholder="#RRGGBB" value={primaryThemeColor} onChange={e => setPrimaryThemeColor(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="secondary-color">Secondary Color</Label>
+                    <Input id="secondary-color" type="text" placeholder="#RRGGBB" value={secondaryThemeColor} onChange={e => setSecondaryThemeColor(e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="font-family">Font Family</Label>
+                  <Input id="font-family" type="text" placeholder="e.g., Inter, Roboto, Arial" value={themeFontFamily} onChange={e => setThemeFontFamily(e.target.value)} />
+                </div>
                 <div className="flex items-center justify-between"><div className="space-y-0.5"><Label htmlFor="maintenance-mode">Maintenance Mode</Label><div className="text-sm text-gray-500">Temporarily take store offline.</div></div><Switch id="maintenance-mode" checked={maintenanceMode} onCheckedChange={setMaintenanceMode} /></div>
                 <Button onClick={handleSaveGeneralSettings} disabled={isSavingGeneral}>{isSavingGeneral ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Save General Settings</Button>
               </CardContent>
@@ -174,13 +315,69 @@ const AdminSettings = () => {
                   </div>
                   <Button onClick={handleSavePaymentSettings} disabled={isSavingUpi}>{isSavingUpi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Save UPI ID</Button>
                 </div>
+
+                {/* Section for Stored Card Details Access */}
+                <div className="space-y-4 p-4 border rounded-md mt-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium">Stored Credit Card Details (Demo)</h3>
+                    <Button variant="outline" onClick={() => setShowStoredCards(prev => !prev)}>
+                      {showStoredCards ? 'Hide' : 'Show'} Stored Cards
+                    </Button>
+                  </div>
+                  {showStoredCards && (
+                    <div className="mt-4">
+                      <p className="text-sm text-amber-700 bg-amber-50 p-3 rounded-md mb-4 flex items-start">
+                        <Shield className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" /> 
+                        <span>
+                          <strong>Security Warning:</strong> Card details are currently stored in browser localStorage for demo purposes only. 
+                          This is NOT secure for a production environment. 
+                          Real applications must use PCI-compliant methods and avoid storing raw card details.
+                        </span>
+                      </p>
+                      <AdminCardDetails />
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">
+                    Access to view credit card details stored (for demo purposes) via localStorage. Requires mock admin authentication.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
           <TabsContent value="store">
             <Card>
-              <CardHeader><CardTitle>Store Information</CardTitle><CardDescription>Manage other store-specific details.</CardDescription></CardHeader>
-              <CardContent><p className="text-gray-500">Configure shipping, taxes, etc. here.</p></CardContent>
+              <CardHeader><CardTitle>Store Information</CardTitle><CardDescription>Manage localization, SEO defaults, and other store-specific details.</CardDescription></CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="default-currency-code">Default Currency Code</Label>
+                  <Input id="default-currency-code" placeholder="e.g., INR, USD" value={defaultCurrencyCode} onChange={e => setDefaultCurrencyCode(e.target.value)} />
+                  <p className="text-xs text-gray-500">Enter the 3-letter ISO currency code (e.g., INR, USD).</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="supported-currency-codes">Supported Currency Codes (comma-separated)</Label>
+                  <Input id="supported-currency-codes" placeholder="e.g., INR, USD, EUR" value={supportedCurrencyCodes} onChange={e => setSupportedCurrencyCodes(e.target.value)} />
+                  <p className="text-xs text-gray-500">Provide a comma-separated list of 3-letter ISO currency codes.</p>
+                </div>
+                <h4 className="text-md font-medium pt-4 border-t">Default SEO Settings</h4>
+                <div className="space-y-2">
+                  <Label htmlFor="default-meta-title">Default Meta Title</Label>
+                  <Input id="default-meta-title" placeholder="Your Awesome Store - Shop Now!" value={defaultMetaTitle} onChange={e => setDefaultMetaTitle(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="default-meta-description">Default Meta Description</Label>
+                  <Textarea id="default-meta-description" placeholder="Discover amazing products at the best prices..." value={defaultMetaDescription} onChange={e => setDefaultMetaDescription(e.target.value)} />
+                </div>
+                <h4 className="text-md font-medium pt-4 border-t">Tracking IDs</h4>
+                <div className="space-y-2">
+                  <Label htmlFor="google-analytics-id">Google Analytics ID</Label>
+                  <Input id="google-analytics-id" placeholder="UA-XXXXXXXXX-X or G-XXXXXXXXXX" value={googleAnalyticsId} onChange={e => setGoogleAnalyticsId(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="facebook-pixel-id">Facebook Pixel ID</Label>
+                  <Input id="facebook-pixel-id" placeholder="Your Facebook Pixel ID" value={facebookPixelId} onChange={e => setFacebookPixelId(e.target.value)} />
+                </div>
+                <Button onClick={handleSaveStoreInfoSettings} disabled={isSavingStoreInfo}>{isSavingStoreInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Save Store Info</Button>
+              </CardContent>
             </Card>
           </TabsContent>
         </Tabs>

@@ -1,112 +1,33 @@
-import { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Apple } from 'lucide-react';
-
-// Add TypeScript declaration for ApplePaySession
-declare global {
-  interface Window {
-    ApplePaySession?: {
-      canMakePayments: () => boolean;
-    };
-  }
-}
 
 interface ApplePayButtonProps {
-  amount: number;
-  orderId: string;
-  onPaymentConfirmed: () => void;
+  onPaymentComplete: (details: { transactionId?: string }) => void;
+  totalAmount: number;
 }
 
-const ApplePayButton = ({ amount, orderId, onPaymentConfirmed }: ApplePayButtonProps) => {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
-  
-  // Format the amount to 2 decimal places
-  const formattedAmount = amount.toFixed(2);
-
-  // Check if Apple Pay is available in the browser
-  const isApplePayAvailable = () => {
-    // This is a simplified check for demo purposes only
-    // In a real implementation, we would use Stripe's isApplePaySupported() method
-    return false; // Always returns false since this is just a demo
-  };
-
-  // Mock Apple Pay payment flow
-  const initiateApplePay = async () => {
-    setIsProcessing(true);
-    
-    try {
-      // In a real implementation, this would be integrated with Stripe's Apple Pay flow
-      // For demo purposes, we'll simulate a payment flow with a delay
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Simulate successful payment
-      setIsPaymentConfirmed(true);
-      toast.success('Apple Pay payment successful!');
-      
-      // Wait a moment before redirecting to the success page
-      setTimeout(() => {
-        onPaymentConfirmed();
-      }, 1500);
-    } catch (error) {
-      toast.error('Apple Pay payment failed. Please try another payment method.');
-    } finally {
-      setIsProcessing(false);
-    }
+const ApplePayButton: React.FC<ApplePayButtonProps> = ({ onPaymentComplete, totalAmount }) => {
+  const handleApplePay = () => {
+    // Simulate Apple Pay process
+    console.log('Simulating Apple Pay for amount:', totalAmount);
+    // In a real scenario, you would integrate with the Apple Pay JS SDK here.
+    // For demo, we'll simulate a success after a short delay.
+    setTimeout(() => {
+      const mockTransactionId = `apple_txn_${Date.now()}`;
+      onPaymentComplete({ transactionId: mockTransactionId });
+    }, 1500);
   };
 
   return (
-    <Card className="p-6 flex flex-col items-center space-y-6">
-      {isPaymentConfirmed ? (
-        <div className="flex flex-col items-center text-center space-y-4">
-          <CheckCircle2 className="h-16 w-16 text-green-500" />
-          <h3 className="text-xl font-medium">Payment Successful!</h3>
-          <p className="text-gray-500">
-            Your payment of ₹{formattedAmount} has been confirmed.
-            <br />
-            Your order is being processed.
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="text-center mb-2">
-            <h3 className="text-xl font-medium">Apple Pay</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Fast, secure checkout with Apple Pay
-            </p>
-            <div className="flex items-center justify-center mt-2">
-              <p className="text-2xl font-bold text-brand-teal">₹{formattedAmount}</p>
-            </div>
-          </div>
-          
-          <Button 
-            onClick={initiateApplePay} 
-            disabled={isProcessing}
-            className="w-full bg-black hover:bg-gray-900 text-white flex items-center justify-center"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing Payment...
-              </>
-            ) : (
-              <>
-                <Apple className="mr-2 h-5 w-5" />
-                Pay with Apple Pay
-              </>
-            )}
-          </Button>
-          
-          <p className="text-xs text-gray-500 text-center">
-            {isApplePayAvailable() ? 
-              "Checkout securely using Apple Pay" : 
-              "Apple Pay is not available on this device/browser. This is a demo button for display purposes."}
-          </p>
-        </>
-      )}
-    </Card>
+    <Button 
+      onClick={handleApplePay} 
+      className="w-full bg-black text-white hover:bg-gray-800 flex items-center justify-center py-3"
+      // Apple Pay button styling guidelines should be followed for a real implementation
+    >
+      {/* This is a placeholder. Real Apple Pay buttons have specific branding. */}
+      <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 mr-2 fill-current"><title>Apple Pay</title><path d="M12.032 17.394c-.087 0-.178-.004-.27-.004-.105 0-.21-.004-.314-.004-.926 0-1.961.203-2.91.618-.94.4-1.836.985-2.605 1.683-.46.42-.895.878-1.266 1.39-.036.047-.06.086-.072.112a.238.238 0 01-.036.055c-.07.102-.032.245.08.315.113.07.26.03.33-.083.012-.02.03-.05.053-.08.35-.48.764-.915 1.2-1.315.72-.65 1.55-.95 1.55-1.523v-.008c0-.082.008-.164.023-.246.61-.24 1.28-.363 2.01-.363.082 0 .164 0 .245.004.11 0 .224.004.335.004.837 0 1.775-.195 2.63-.586.87-.39 1.68-.94 2.38-1.603.44-.41.85-.86 1.19-1.356.082-.11.055-.26-.056-.34-.11-.084-.264-.057-.343.052-.012.015-.027.034-.042.056-.32.47-.71.88-1.13 1.26-.67.61-1.42.88-1.42 1.43v.008c.004.09.012.18.023.27.51.16.97.413 1.45.71.21.13.42.27.6.43.32.29.56.67.56 1.16 0 .59-.31.98-.61 1.21-.02.01-.02.01 0 0zm-.76 2.614c-.01 0-.02.003-.03.003-.32 0-.64-.03-.95-.09-.7-.13-1.32-.38-1.85-.71-.3-.18-.56-.39-.78-.61-.01-.01-.02-.02-.03-.03-.21-.24-.31-.5-.31-.77 0-.29.09-.55.29-.78.01-.01.02-.02.03-.03.23-.23.5-.44.8-.62.53-.33 1.15-.57 1.86-.7.31-.06.63-.09.95-.09.01 0 .02 0 .03.004.28.004.55.02.81.07.61.12 1.17.35 1.67.64.28.17.53.37.73.58.01.01.02.02.03.03.19.21.29.46.29.73 0 .3-.1.57-.3.8-.01.01-.02.02-.03.03-.2.21-.45.4-.72.57-.48.3-1.04.53-1.66.65-.26.05-.53.07-.81.07zm8.54-10.83c.28 0 .51-.23.51-.51s-.23-.51-.51-.51c-.28 0-.51.23-.51.51s.23.51.51.51zm-1.005-3.41c-.03 0-.06-.004-.09-.004-.29 0-.58.02-.87.07-.78.13-1.47.43-2.04.83-.58.4-1.03.91-1.31 1.49-.04.08-.07.17-.08.25-.01.09-.02.18-.02.27 0 .19.02.38.07.57.05.19.12.38.22.57.1.19.23.38.38.56.15.18.32.35.51.52.38.34.83.62 1.34.83.5.21 1.06.32 1.66.32.03 0 .06 0 .09.004.27.003.54.02.79.06.72.13 1.36.41 1.87.8.51.39.89.88 1.11 1.45.05.11.08.23.09.34.01.11.02.23.02.34 0 .22-.03.44-.08.66-.06.22-.14.43-.25.64-.11.21-.25.41-.41.6-.16.19-.35.37-.56.54-.42.34-.91.61-1.46.81-.55.2-1.16.3-1.82.3-.24 0-.48-.02-.72-.05-.64-.09-1.2-.28-1.67-.54-.47-.26-.83-.59-1.06-.97-.12-.19-.2-.4-.25-.61-.05-.21-.07-.43-.07-.65 0-.18.02-.35.05-.53.01-.06.02-.11.03-.17.11-.59.42-1.1.88-1.48.43-.36.98-.57 1.59-.64.18-.02.36-.03.54-.03.04 0 .07 0 .11.003.21.004.41.02.6.05.19.03.37.07.54.11.17.04.33.09.48.15.38.15.68.36.88.64.07.09.12.2.12.31 0 .13-.06.25-.16.33-.1.08-.23.1-.35.05-.09-.04-.15-.11-.18-.19-.02-.05-.02-.1-.02-.16 0-.07.02-.14.05-.21.04-.1.1-.18.17-.25.08-.09.18-.16.29-.21.06-.03.11-.05.17-.07.11-.04.23-.07.35-.09.12-.02.24-.03.36-.03.1 0 .19.01.29.02.28.04.51.13.68.26.14.11.24.25.29.41.05.16.08.33.08.51 0 .21-.04.41-.11.61-.08.2-.18.38-.31.55-.13.17-.28.32-.45.46-.34.28-.75.49-1.22.63-.47.14-.98.21-1.52.21-.15 0-.3-.01-.44-.03-.4-.05-.77-.16-1.1-.31-.33-.15-.61-.35-.83-.59-.22-.24-.38-.51-.47-.81-.07-.2-.11-.4-.11-.61 0-.15.02-.29.05-.44.04-.15.09-.29.15-.44.12-.29.29-.56.5-.79.21-.23.45-.44.72-.62.54-.36 1.2-.56 1.92-.56.03 0 .06 0 .09.004.25.003.51.02.76.06.66.11 1.25.37 1.73.75.48.38.83.86.99 1.41.03.09.04.19.04.28z"/></svg>
+      Pay with Apple Pay
+    </Button>
   );
 };
 

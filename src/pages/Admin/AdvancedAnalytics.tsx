@@ -45,6 +45,10 @@ import {
 import AdminLayout from '@/components/layout/AdminLayout';
 import { format } from 'date-fns';
 import { toast } from "@/hooks/use-toast";
+import { useQuery } from '@tanstack/react-query';
+import { Bar, Line } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, Filler } from 'chart.js';
+import 'chartjs-adapter-date-fns';
 
 interface ExportDialogProps {
   isOpen: boolean;
@@ -65,6 +69,7 @@ const ExportDialog = ({ isOpen, onClose, report, onExport }: ExportDialogProps) 
     includeTimestamp: true
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleOptionChange = (key: keyof ReportExportOptions, value: any) => {
     setExportOptions(prev => ({ ...prev, [key]: value }));
   };
@@ -251,6 +256,7 @@ const ScheduleDialog = ({ isOpen, onClose, report, onSchedule }: ScheduleDialogP
     includeTimestamp: true
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleOptionChange = (key: keyof ReportExportOptions, value: any) => {
     setExportOptions(prev => ({ ...prev, [key]: value }));
   };

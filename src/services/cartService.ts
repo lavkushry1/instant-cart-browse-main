@@ -1,22 +1,23 @@
 // src/services/cartService.ts (Backend Operations)
 
+import * as admin from 'firebase-admin'; // Import admin namespace for types
 // Import Firebase Admin resources
 import {
   db, // Firestore instance from firebaseAdmin.ts
-  adminInstance // For FieldValue, Timestamp etc. from firebaseAdmin.ts
-} from '../../lib/firebaseAdmin'; // Adjust path as necessary
+  adminInstance // For FieldValue, Timestamp etc. from firebaseAdmin.ts. Note: adminInstance is also 'admin'
+} from '../lib/firebaseAdmin'; // Corrected path
 const USER_CARTS_COLLECTION = 'user_carts'; 
 
 export interface BackendCartItem {
     productId: string;
     quantity: number;
-    addedAt: any; // admin.firestore.Timestamp 
+    addedAt: admin.firestore.Timestamp | admin.firestore.FieldValue; // Allow FieldValue for writing
 }
 
 export interface UserCartBE {
     userId: string; 
     items: BackendCartItem[];
-    updatedAt: any; // admin.firestore.Timestamp
+    updatedAt: admin.firestore.Timestamp | admin.firestore.FieldValue; // Allow FieldValue for writing
 }
 
 console.log(`(Service-Backend) Cart Service: Using Firestore collection: ${USER_CARTS_COLLECTION}`);

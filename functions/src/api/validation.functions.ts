@@ -1,6 +1,6 @@
 // functions/src/api/validation.functions.ts
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import {
   validateZipCodeBE,
   ZipCodeValidationResult
@@ -35,16 +35,17 @@ export const validateZipCodeCF = functions.https.onCall(async (data: ValidateZip
     
     return { success: true, validationResult: result };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in validateZipCodeCF:", error);
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
+    const message = error instanceof Error ? error.message : 'Failed to validate ZIP code due to an internal error.';
     // Log the error details for admin review
-    functions.logger.error("Internal error in validateZipCodeCF:", { data, error: error.message });
+    functions.logger.error("Internal error in validateZipCodeCF:", { data, error: message });
     throw new functions.https.HttpsError(
       'internal',
-      error.message || 'Failed to validate ZIP code due to an internal error.'
+      message
     );
   }
 });

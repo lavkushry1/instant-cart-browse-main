@@ -1,6 +1,6 @@
 // functions/src/api/products.functions.ts
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import {
   createProductBE,
   getProductByIdBE,
@@ -29,54 +29,58 @@ export const createProductCF = functions.https.onCall(async (data: ProductCreati
     }
     const newProduct = await createProductBE(data);
     return { success: true, product: newProduct };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in createProductCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to create product.');
+    const message = error instanceof Error ? error.message : 'Failed to create product.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
-export const getProductByIdCF = functions.https.onRequest(async (req, res) => {
-  console.log("(Cloud Function) getProductByIdCF called.");
+export const getProductByIdCF = functions.https.onCall(async (data: { productId: string }, context) => {
+  console.log("(Cloud Function) getProductByIdCF (callable) called with data:", data);
+  // No admin check here, as this might be used publicly. 
+  // getProductByIdBE fetches regardless of isEnabled status, which is fine for admin edit form.
   try {
-    const productId = req.query.id as string;
+    const { productId } = data;
     if (!productId) {
-      res.status(400).send({ success: false, error: 'Product ID is required.' });
-      return;
+      throw new functions.https.HttpsError('invalid-argument', 'Product ID is required.');
     }
     const product = await getProductByIdBE(productId);
     if (product) {
-      res.status(200).send({ success: true, product });
+      return { success: true, product };
     } else {
-      res.status(404).send({ success: false, error: 'Product not found.' });
+      // To align with HttpsError for client-side handling if preferred for not found
+      throw new functions.https.HttpsError('not-found', 'Product not found.');
+      // return { success: false, error: 'Product not found.' }; // Alternative return
     }
-  } catch (error: any) {
-    console.error("Error in getProductByIdCF:", error);
-    res.status(500).send({ success: false, error: error.message || 'Failed to get product.' });
+  } catch (error: unknown) {
+    console.error("Error in getProductByIdCF (callable):", error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    const message = error instanceof Error ? error.message : 'Failed to get product.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
-export const getAllProductsCF = functions.https.onRequest(async (req, res) => {
-  console.log("(Cloud Function) getAllProductsCF called with query:", req.query);
+export const getAllProductsCF = functions.https.onCall(async (data: GetAllProductsOptionsBE | undefined, context) => {
+  console.log("(Cloud Function) getAllProductsCF (callable) called with data:", data);
+  ensureAdmin(context);
   try {
-    const options: GetAllProductsOptionsBE = {
-      categoryId: req.query.categoryId as string | undefined,
-      featured: req.query.featured ? req.query.featured === 'true' : undefined,
-      isEnabled: req.query.isEnabled === 'false' ? false : true, // Default to true unless 'false' is specified
-      minPrice: req.query.minPrice ? parseFloat(req.query.minPrice as string) : undefined,
-      maxPrice: req.query.maxPrice ? parseFloat(req.query.maxPrice as string) : undefined,
-      sortBy: req.query.sortBy as any || 'createdAt',
-      sortOrder: req.query.sortOrder as any || 'desc',
-      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 20, // Default limit
-      // startAfter needs to be handled carefully - it's a Firestore DocumentSnapshot usually passed from client after JSON stringification
-      // For a real implementation, you'd need to deserialize this correctly or pass cursor fields.
-      // startAfter: req.query.startAfter ? (JSON.parse(req.query.startAfter as string)) : undefined, 
-    };
-    const result = await getAllProductsBE(options);
-    res.status(200).send({ success: true, ...result });
-  } catch (error: any) {
-    console.error("Error in getAllProductsCF:", error);
-    res.status(500).send({ success: false, error: error.message || 'Failed to get all products.' });
+    // Use data directly as options, or default to empty object if undefined
+    const options: GetAllProductsOptionsBE = data || {}; 
+    // The admin panel sends isEnabled: undefined to fetch all products (enabled and disabled)
+    // It also sends sortBy and sortOrder. Default limit can be applied here or in BE.
+    // Example default options if not provided by client, or let BE handle its defaults:
+    // const defaultOptions: GetAllProductsOptionsBE = { limit: 20, sortBy: 'createdAt', sortOrder: 'desc' };
+    // const finalOptions = { ...defaultOptions, ...options };
+
+    const result = await getAllProductsBE(options); // Pass client options to BE service
+    return { success: true, products: result.products, totalCount: result.totalCount, lastVisible: result.lastVisible }; // lastVisible might be needed for pagination
+  } catch (error: unknown) {
+    console.error("Error in getAllProductsCF (callable):", error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    const message = error instanceof Error ? error.message : 'Failed to get all products.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
@@ -91,10 +95,11 @@ export const updateProductCF = functions.https.onCall(async (data: { productId: 
     // TODO: Server-side validation of updateData fields
     const updatedProduct = await updateProductBE(productId, updateData);
     return { success: true, product: updatedProduct };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in updateProductCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to update product.');
+    const message = error instanceof Error ? error.message : 'Failed to update product.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
@@ -108,9 +113,10 @@ export const deleteProductCF = functions.https.onCall(async (data: { productId: 
     }
     await deleteProductBE(productId);
     return { success: true, message: 'Product deleted successfully.' };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in deleteProductCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to delete product.');
+    const message = error instanceof Error ? error.message : 'Failed to delete product.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });

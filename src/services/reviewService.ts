@@ -1,10 +1,11 @@
 // src/services/reviewService.ts
 
+import * as admin from 'firebase-admin'; // Import for Timestamp, DocumentSnapshot types
 // Import Firebase Admin resources
 import {
   db, // Firestore instance from firebaseAdmin.ts
   adminInstance // For FieldValue, Timestamp etc. from firebaseAdmin.ts
-} from '../../lib/firebaseAdmin'; // Adjust path as necessary
+} from '../lib/firebaseAdmin'; // Corrected path
 const PRODUCTS_COLLECTION = 'products';
 const REVIEWS_SUBCOLLECTION = 'reviews';
 
@@ -15,13 +16,27 @@ export interface ProductReviewBE {
   reviewerName?: string; 
   rating: number; 
   comment?: string;
-  createdAt: any; // admin.firestore.Timestamp
-  updatedAt: any; // admin.firestore.Timestamp
+  createdAt: admin.firestore.Timestamp | admin.firestore.FieldValue; // Corrected type
+  updatedAt: admin.firestore.Timestamp | admin.firestore.FieldValue; // Corrected type
   approved?: boolean; 
 }
 
 export type ReviewCreationData = Omit<ProductReviewBE, 'id' | 'productId' | 'createdAt' | 'updatedAt'>;
+
+// Interface for data being written to Firestore during review creation
+interface ReviewWriteData extends ReviewCreationData {
+    productId: string; // Explicitly part of write data although omitted from CreationData for external use
+    approved: boolean; // Ensure approved is part of the write type
+    createdAt: admin.firestore.FieldValue;
+    updatedAt: admin.firestore.FieldValue;
+}
+
 export type ReviewUpdateData = Partial<Omit<ProductReviewBE, 'id' | 'productId' | 'userId' | 'createdAt' | 'updatedAt'> & { approved?: boolean }>;
+
+// Interface for data being written to Firestore during review update
+interface ReviewUpdateWriteData extends ReviewUpdateData {
+    updatedAt: admin.firestore.FieldValue;
+}
 
 console.log(`(Service-Backend) Review Service: Using subcollection: ${PRODUCTS_COLLECTION}/{productId}/${REVIEWS_SUBCOLLECTION}`);
 
@@ -55,10 +70,10 @@ export const createReviewBE = async (productId: string, reviewData: ReviewCreati
                                     .where('userId', '==', reviewData.userId).limit(1);
       const existingReviewSnap = await transaction.get(existingReviewQuery);
       if (!existingReviewSnap.empty) throw new Error('User has already reviewed this product.');
-      const dataToSave: any = {
+      const dataToSave: ReviewWriteData = {
         ...reviewData,
         productId: productId,
-        approved: reviewData.approved === undefined ? false : reviewData.approved, // Default to not approved for moderation
+        approved: reviewData.approved === undefined ? false : reviewData.approved,
         createdAt: adminInstance.firestore.FieldValue.serverTimestamp(),
         updatedAt: adminInstance.firestore.FieldValue.serverTimestamp(),
       };
@@ -102,13 +117,13 @@ export interface GetReviewsAdminOptionsBE {
     userId?: string; // Filter by specific user
     approved?: boolean; // Filter by approval status (true, false, or undefined for all)
     limit?: number;
-    startAfter?: any; // Firestore DocumentSnapshot
+    startAfter?: admin.firestore.DocumentSnapshot; // Corrected type
     sortBy?: 'createdAt' | 'rating';
     sortOrder?: 'asc' | 'desc';
 }
 
 // New function for Admin to get reviews with more filters
-export const getReviewsAdminBE = async (options: GetReviewsAdminOptionsBE = {}): Promise<{ reviews: ProductReviewBE[], lastVisible?: any, totalCount?: number}> => {
+export const getReviewsAdminBE = async (options: GetReviewsAdminOptionsBE = {}): Promise<{ reviews: ProductReviewBE[], lastVisible?: admin.firestore.DocumentSnapshot, totalCount?: number}> => {
     console.log('(Service-Backend) getReviewsAdminBE with options:', options);
     try {
         // This query needs to be on the root 'reviews' collection if not per product, 
@@ -135,7 +150,7 @@ export const getReviewsAdminBE = async (options: GetReviewsAdminOptionsBE = {}):
         const snapshot = await query.get();
         if (snapshot.empty) return { reviews: [] };
         const reviews = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductReviewBE));
-        const lastVisible = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : undefined;
+        const lastVisible: admin.firestore.DocumentSnapshot | undefined = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : undefined;
         return { reviews, lastVisible, totalCount: reviews.length }; // totalCount is approximated
     } catch (error) {
         console.error("Error in getReviewsAdminBE:", error);
@@ -150,9 +165,13 @@ export const updateReviewBE = async (productId: string, reviewId: string, review
     await db.runTransaction(async (transaction: admin.firestore.Transaction) => {
       const reviewDoc = await transaction.get(reviewRef);
       if (!reviewDoc.exists) throw new Error('Review not found.');
-      const dataToUpdate: any = { ...reviewUpdateData, updatedAt: adminInstance.firestore.FieldValue.serverTimestamp() };
-      Object.keys(dataToUpdate).forEach(key => dataToUpdate[key] === undefined && delete dataToUpdate[key]);
-      transaction.update(reviewRef, dataToUpdate);
+      const dataToUpdate: ReviewUpdateWriteData = {
+        ...reviewUpdateData,
+        updatedAt: adminInstance.firestore.FieldValue.serverTimestamp()
+      };
+      // Object.keys(dataToUpdate).forEach(key => dataToUpdate[key] === undefined && delete dataToUpdate[key]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transaction.update(reviewRef, dataToUpdate as { [key: string]: any }); // Keep cast for Firestore flexibility
       // If 'approved' status changes, product rating should be recalculated.
       await updateProductRatingStats(transaction, productId);
     });

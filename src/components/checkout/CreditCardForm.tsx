@@ -25,9 +25,21 @@ interface CreditCardFormProps {
   initialCardDetails?: CardDetails | null;
 }
 
+// Define the expected direct return type from the Cloud Function
+interface ValidateZipCodeCFResponse {
+  success: boolean;
+  validationResult: { 
+    isValid: boolean; 
+    message?: string;
+    // Potentially other fields like placeName, state from actual ZipCodeValidationResult if needed here
+  };
+  error?: string; // If success can be false with an error message property
+}
+
 const TEMP_CARD_DETAILS_STORAGE_KEY = 'tempCardDetailsForAddressCorrection';
 
-let validateZipCodeFunction: HttpsCallable<{ zipCode: string; countryCode?: string }, HttpsCallableResult<{ isValid: boolean; message?: string }>> | undefined;
+// Correctly type the HttpsCallable: Input type, and direct JSON Output type from CF
+let validateZipCodeFunction: HttpsCallable<{ zipCode: string; countryCode?: string }, ValidateZipCodeCFResponse> | undefined;
 
 if (functionsClient && Object.keys(functionsClient).length > 0) {
   try {
@@ -38,11 +50,18 @@ if (functionsClient && Object.keys(functionsClient).length > 0) {
     console.warn("CreditCardForm: Firebase functions client not available for ZIP validation.");
 }
 
-const fallbackValidateZipCode = async (zipCode: string): Promise<HttpsCallableResult<{ isValid: boolean; message?: string }>> => {
+// Fallback should mimic the structure of the *direct data* returned by the HttpsCallableResult, not the whole HttpsCallableResult
+const fallbackValidateZipCode = async (zipCode: string): Promise<ValidateZipCodeCFResponse> => {
     console.warn("Using MOCK for ZIP Code validation.");
     await new Promise(r => setTimeout(r, 200));
-    if (zipCode.startsWith('9')) return { data: { isValid: false, message: 'Invalid ZIP (Demo: cannot start with 9)' } };
-    return { data: { isValid: true, message: 'ZIP appears valid (Demo)' } };
+    if (zipCode.startsWith('9')) return { 
+        success: false, 
+        validationResult: { isValid: false, message: 'Invalid ZIP (Demo: cannot start with 9)' } 
+    };
+    return { 
+        success: true, 
+        validationResult: { isValid: true, message: 'ZIP appears valid (Demo)' } 
+    };
 };
 
 const CreditCardForm = ({ addressDetails, onAddressCorrection, onPaymentComplete, totalAmount, initialCardDetails = null }: CreditCardFormProps) => {
@@ -80,19 +99,24 @@ const CreditCardForm = ({ addressDetails, onAddressCorrection, onPaymentComplete
     if (cardDetails.cvv.length !== 3) { toast.error('Valid 3-digit CVV required'); return; }
     
     setIsSubmittingCard(true);
-    let zipValidationResult: HttpsCallableResult<{ isValid: boolean; message?: string }>;
+    let cfResponseData: ValidateZipCodeCFResponse;
     try {
-        const validateFn = validateZipCodeFunction || (() => fallbackValidateZipCode(addressDetails.zipCode));
-        zipValidationResult = await validateFn({ zipCode: addressDetails.zipCode, countryCode: addressDetails.countryCode || 'IN' });
+        if (validateZipCodeFunction) {
+            const result: HttpsCallableResult<ValidateZipCodeCFResponse> = await validateZipCodeFunction({ zipCode: addressDetails.zipCode, countryCode: addressDetails.countryCode || 'IN' });
+            cfResponseData = result.data;
+        } else {
+            cfResponseData = await fallbackValidateZipCode(addressDetails.zipCode);
+        }
 
-        if (!zipValidationResult.data.isValid) {
+        if (!cfResponseData.success || !cfResponseData.validationResult.isValid) {
             sessionStorage.setItem(TEMP_CARD_DETAILS_STORAGE_KEY, JSON.stringify(cardDetails));
-            onAddressCorrection(true, zipValidationResult.data.message || 'Invalid ZIP code. Please correct your address.');
+            onAddressCorrection(true, cfResponseData.validationResult.message || cfResponseData.error || 'Invalid ZIP code. Please correct your address.');
             setIsSubmittingCard(false);
             return;
         }
-    } catch (error: any) {
-        toast.error(`ZIP validation error: ${error.message || 'Could not validate address.'}`);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Could not validate address.';
+        toast.error(`ZIP validation error: ${message}`);
         setIsSubmittingCard(false);
         return;
     }
@@ -117,7 +141,12 @@ const CreditCardForm = ({ addressDetails, onAddressCorrection, onPaymentComplete
     <div className="space-y-6">
       {!otpSent && !transactionPending && (
         <form onSubmit={handleSubmitCardDetails} className="space-y-4">
-          {/* ... Form inputs ... */}
+          <div><Label htmlFor="cardName">Name on Card</Label><Input id="cardName" value={cardDetails.cardName} onChange={e => setCardDetails({...cardDetails, cardName: e.target.value})} required /></div>
+          <div><Label htmlFor="cardNumber">Card Number</Label><Input id="cardNumber" placeholder="0000 0000 0000 0000" value={cardDetails.cardNumber} onChange={e => setCardDetails({...cardDetails, cardNumber: e.target.value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim().slice(0, 19)})} required /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label htmlFor="expiry">Expiry Date (MM/YY)</Label><Input id="expiry" placeholder="MM/YY" value={cardDetails.expiry} onChange={e => setCardDetails({...cardDetails, expiry: e.target.value.replace(/\D/g, '').replace(/(.{2})/, '$1/').trim().slice(0,5)})} required /></div>
+            <div><Label htmlFor="cvv">CVV</Label><Input id="cvv" placeholder="123" value={cardDetails.cvv} onChange={e => setCardDetails({...cardDetails, cvv: e.target.value.replace(/\D/g, '').slice(0,3)})} required /></div>
+          </div>
           <Button type="submit" className="w-full" disabled={isSubmittingCard}>{isSubmittingCard ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Proceed to Verification</Button>
         </form>
       )}

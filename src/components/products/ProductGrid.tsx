@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import ProductCard from './ProductCard';
 import { Product } from '@/types/product';
-import { Skeleton } from '@/components/ui/skeleton';
+import ProductCardSkeleton from './ProductCardSkeleton';
 
 interface ProductGridProps {
   products: Product[];
@@ -26,23 +26,13 @@ const ProductGrid = ({ products, loading = false }: ProductGridProps) => {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {Array.from({ length: 8 }).map((_, index) => (
-          <div key={index} className="bg-white rounded-lg overflow-hidden shadow-sm">
-            <Skeleton className="h-64 w-full" />
-            <div className="p-4 space-y-3">
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-              <Skeleton className="h-6 w-1/4" />
-            </div>
-            <div className="px-4 pb-4">
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </div>
+          <ProductCardSkeleton key={index} />
         ))}
       </div>
     );
   }
 
-  if (products.length === 0) {
+  if (products.length === 0 && !loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <div className="text-5xl mb-4">😢</div>
@@ -60,7 +50,15 @@ const ProductGrid = ({ products, loading = false }: ProductGridProps) => {
           className="animate-fade-in" 
           style={{ animationDelay: `${index * 100}ms` }}
         >
-          <ProductCard product={product} />
+          <ProductCard product={{
+            id: product.id,
+            imageUrl: product.images && product.images.length > 0 ? product.images[0] : 'placeholder.svg', // Use first image or a placeholder
+            title: product.name,         
+            price: product.price,
+            outOfStock: product.stock <= 0,
+            categoryId: product.category, // Assuming local product.category can map to categoryId
+            // originalDiscount: product.discount, // If ProductCard needs to show a base discount from product data
+          }} />
         </div>
       ))}
     </div>

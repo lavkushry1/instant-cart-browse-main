@@ -1,12 +1,38 @@
 // functions/src/api/cart.functions.ts
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import {
   getUserCartBE,
   setItemInUserCartBE,
   clearUserCartBE,
-} from '../../../src/services/cartService'; // Adjust path
-import { UserCartBE } from '../../../src/services/cartService';
+  mergeGuestCartToFirestore,
+  ProductInCartBE, // Import type for mapping
+  UserCartBE // Import for return type if needed
+} from '../services/cartService'; 
+
+// Client-side Product structure (subset for setItem)
+// This aligns with what setItemInUserCartBE needs for productData
+interface ProductDataForCF {
+  id: string;
+  name: string;
+  price: number;
+  images?: string[];
+  // Other fields client might send, that can be mapped to ProductInCartBE
+}
+
+// Data structure for setItemInUserCartCF
+interface SetItemData {
+  productId: string;
+  quantity: number;
+  product: ProductDataForCF; // Client sends product details
+}
+
+// Client-side CartItem structure for mergeGuestCartCF
+interface ClientMergeCartItem {
+  id: string; 
+  product: any; // Client's full Product type
+  quantity: number;
+}
 
 const ensureAuthenticated = (context: functions.https.CallableContext): string => {
   if (!context.auth) {
@@ -15,55 +41,98 @@ const ensureAuthenticated = (context: functions.https.CallableContext): string =
   return context.auth.uid;
 };
 
-console.log("(Cloud Functions) cart.functions.ts: Initializing with LIVE logic...");
+console.log("(Cloud Functions) cart.functions.ts: Initializing...");
 
-export const getUserCartCF = functions.https.onCall(async (data, context) => {
-  console.log("(Cloud Function) getUserCartCF called.");
+export const getUserCartCF = functions.https.onCall(async (_data, context) => {
+  functions.logger.info("(Cloud Function) getUserCartCF called.");
   const userId = ensureAuthenticated(context);
   try {
     const cart = await getUserCartBE(userId);
-    // The cart from BE contains only productIds and quantities.
-    // Client is responsible for fetching full product details if needed for display.
-    if (cart) {
+    if (cart) { // getUserCartBE returns UserCartBE | null
         return { success: true, cart };
     }
-    // If no cart exists in DB, return an empty cart structure for the user.
-    return { success: true, cart: { userId, items: [], updatedAt: null } }; 
-  } catch (error: any) {
-    console.error("Error in getUserCartCF:", error);
+    // If service returns null (e.g. error or explicitly for not found if not returning empty cart)
+    // We can choose to return an error or an empty cart structure.
+    // Based on getUserCartBE returning {userId, items:[]} for empty, null means an error.
+    throw new functions.https.HttpsError('internal', 'Failed to get user cart. Service returned null.');
+  } catch (error: unknown) {
+    functions.logger.error("Error in getUserCartCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to get user cart.');
+    const message = error instanceof Error ? error.message : 'Failed to get user cart.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
-export const setItemInUserCartCF = functions.https.onCall(async (data: { productId: string; quantity: number }, context) => {
-  console.log("(Cloud Function) setItemInUserCartCF called with data:", data);
+export const setItemInUserCartCF = functions.https.onCall(async (data: SetItemData, context) => {
+  functions.logger.info("(Cloud Function) setItemInUserCartCF called with data:", data);
   const userId = ensureAuthenticated(context);
   try {
-    const { productId, quantity } = data;
-    if (!productId || typeof quantity !== 'number' || quantity < 0) { // Quantity cannot be negative
-      throw new functions.https.HttpsError('invalid-argument', 'Product ID and a non-negative quantity (number) are required.');
+    const { productId, quantity, product } = data;
+    if (!productId || typeof quantity !== 'number' || product?.id !== productId) {
+      throw new functions.https.HttpsError('invalid-argument', 'Valid Product ID, quantity, and matching product data are required.');
     }
-    // TODO: Add validation for quantity if necessary (e.g., max cart item quantity).
-    // Optionally, check product existence and stock before adding to cart, though stock check is often better at checkout.
-    const updatedCart = await setItemInUserCartBE(userId, productId, quantity);
-    return { success: true, cart: updatedCart };
-  } catch (error: any) {
-    console.error("Error in setItemInUserCartCF:", error);
+
+    // Map client product data to ProductInCartBE for the service
+    const productDataForService: ProductInCartBE = {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      images: product.images && product.images.length > 0 ? product.images.slice(0,1) : [], // Example: take first image
+    };
+
+    const updatedCart = await setItemInUserCartBE(userId, productId, quantity, productDataForService);
+    if (updatedCart) {
+      return { success: true, cart: updatedCart };
+    } else {
+      throw new functions.https.HttpsError('internal', 'Failed to update item in cart. Service returned null.');
+    }
+  } catch (error: unknown) {
+    functions.logger.error("Error in setItemInUserCartCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to update item in cart.');
+    const message = error instanceof Error ? error.message : 'Failed to update item in cart.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
-export const clearUserCartCF = functions.https.onCall(async (data, context) => {
-  console.log("(Cloud Function) clearUserCartCF called.");
+export const clearUserCartCF = functions.https.onCall(async (_data, context) => {
+  functions.logger.info("(Cloud Function) clearUserCartCF called.");
   const userId = ensureAuthenticated(context);
   try {
-    await clearUserCartBE(userId);
-    return { success: true, message: 'Cart cleared successfully.' };
-  } catch (error: any) {
-    console.error("Error in clearUserCartCF:", error);
+    const result = await clearUserCartBE(userId);
+    if (result.success) {
+      return { success: true, message: 'Cart cleared successfully.' };
+    } else {
+      throw new functions.https.HttpsError('internal', result.error || 'Failed to clear cart.');
+    }
+  } catch (error: unknown) {
+    functions.logger.error("Error in clearUserCartCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to clear cart.');
+    const message = error instanceof Error ? error.message : 'Failed to clear cart.';
+    throw new functions.https.HttpsError('internal', message);
+  }
+});
+
+export const mergeGuestCartCF = functions.https.onCall(async (data: { items: ClientMergeCartItem[] }, context) => {
+  functions.logger.info("(Cloud Function) mergeGuestCartCF called with item count:", data.items?.length);
+  const uid = ensureAuthenticated(context);
+
+  if (!Array.isArray(data.items)) {
+    functions.logger.error('Invalid data: items must be an array.', data);
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid data format: items must be an array.');
+  }
+
+  try {
+    const result = await mergeGuestCartToFirestore(uid, data.items);
+    if (result.success) {
+      return { success: true, message: 'Guest cart merged successfully.' };
+    } else {
+      functions.logger.error('mergeGuestCartToFirestore failed:', result.error);
+      throw new functions.https.HttpsError('internal', result.error || 'Failed to merge guest cart.');
+    }
+  } catch (error: unknown) {
+    functions.logger.error("Error in mergeGuestCartCF:", error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    const message = error instanceof Error ? error.message : 'An internal error occurred while merging the cart.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });

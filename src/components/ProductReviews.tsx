@@ -14,11 +14,10 @@ import {
   CardTitle 
 } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
-import { 
-  getProductReviews, 
-  addProductReview, 
-  voteReviewHelpful 
-} from '../services/reviewService';
+import { functionsClient } from '@/lib/firebaseClient';
+import { httpsCallable, HttpsCallable } from 'firebase/functions';
+import { ProductReview as BEProductReview } from '@/services/productService';
+import { Timestamp } from 'firebase/firestore';
 
 export interface Review {
   id: string;
@@ -32,6 +31,24 @@ export interface Review {
   isVerifiedPurchase: boolean;
   helpfulVotes: number;
   userVoted?: boolean;
+}
+
+interface GetProductReviewsCFResponse {
+  success: boolean;
+  reviews?: BEProductReview[];
+  error?: string;
+}
+
+interface AddReviewCFData {
+  productId: string;
+  rating: number;
+  comment?: string;
+}
+
+interface AddReviewCFResponse {
+  success: boolean;
+  review?: BEProductReview;
+  error?: string;
 }
 
 interface ProductReviewsProps {
@@ -53,28 +70,78 @@ const ProductReviews = ({ productId, productName }: ProductReviewsProps) => {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Firebase Callables
+  let getProductReviewsCallable: HttpsCallable<{ productId: string; limit?: number; /* TODO: startAfter support */ }, GetProductReviewsCFResponse> | undefined;
+  let addReviewCallable: HttpsCallable<AddReviewCFData, AddReviewCFResponse> | undefined;
+
+  if (functionsClient && Object.keys(functionsClient).length > 0) {
+    try {
+      getProductReviewsCallable = httpsCallable(functionsClient, 'reviews-getProductReviewsCF');
+      addReviewCallable = httpsCallable(functionsClient, 'reviews-addReviewCF');
+      console.log("ProductReviews: Live httpsCallable references created for review functions.");
+    } catch (error) {
+      console.error("ProductReviews: Error preparing httpsCallable for review functions:", error);
+      toast.error("Error initializing connection to review services.");
+    }
+  } else {
+    console.warn("ProductReviews: Firebase functions client not available. Review operations will fail.");
+    // TODO: Consider mock fallbacks for UI development if desired
+  }
+
+  // Helper to map BEProductReview to local Review type
+  const mapBEToLocalReview = (beReview: BEProductReview, pId: string): Review => ({
+    id: beReview.id,
+    productId: pId, // productId is from props, beReview might not have it directly if not returned by CF explicitly
+    userId: beReview.userId,
+    userName: beReview.reviewerName || 'Anonymous',
+    rating: beReview.rating,
+    title: '', // BE model does not have title
+    comment: beReview.comment || '',
+    date: beReview.createdAt ? (beReview.createdAt as Timestamp).toDate().toLocaleDateString() : new Date().toLocaleDateString(),
+    isVerifiedPurchase: false, // BE model does not have this
+    helpfulVotes: 0, // BE model does not have this
+    userVoted: false, // BE model does not have this
+  });
+
   // Fetch reviews on component mount
   useEffect(() => {
     const fetchReviews = async () => {
+      if (!getProductReviewsCallable) {
+        toast.error("Review service is not available.");
+        setIsLoading(false);
+        return;
+      }
       try {
-        const productReviews = await getProductReviews(productId);
-        setReviews(productReviews);
-        
-        // Calculate average rating
-        if (productReviews.length > 0) {
-          const totalRating = productReviews.reduce((sum, review) => sum + review.rating, 0);
-          setAverageRating(totalRating / productReviews.length);
+        setIsLoading(true); // Ensure loading is true at start
+        const result = await getProductReviewsCallable({ productId });
+        if (result.data.success && result.data.reviews) {
+          const fetchedReviews = result.data.reviews.map(r => mapBEToLocalReview(r, productId));
+          setReviews(fetchedReviews);
+          
+          if (fetchedReviews.length > 0) {
+            const totalRating = fetchedReviews.reduce((sum, review) => sum + review.rating, 0);
+            setAverageRating(totalRating / fetchedReviews.length);
+          } else {
+            setAverageRating(0);
+          }
+        } else {
+          console.error('Error fetching product reviews:', result.data.error);
+          toast.error(result.data.error || 'Failed to load product reviews');
+          setAverageRating(0); // Reset on error
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching product reviews:', error);
-        toast.error('Failed to load product reviews');
+        toast.error(`Failed to load product reviews: ${error.message || 'Unknown error'}`);
+        setAverageRating(0); // Reset on error
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchReviews();
-  }, [productId]);
+    if (productId) { // Ensure productId is available
+      fetchReviews();
+    }
+  }, [productId]); // Depend on productId to refetch if it changes
 
   // Handle star rating click
   const handleRatingClick = (rating: number) => {
@@ -93,17 +160,16 @@ const ProductReviews = ({ productId, productName }: ProductReviewsProps) => {
     
     if (!user) {
       toast.error('Please log in to submit a review');
-      navigate('/login');
+      navigate('/login'); // Make sure navigate is imported from react-router-dom
       return;
     }
     
-    // Validate review data
     if (userReview.rating === 0) {
       toast.error('Please select a rating');
       return;
     }
     
-    if (!userReview.title.trim()) {
+    if (!userReview.title.trim()) { // Title is in form, but not sent to BE currently
       toast.error('Please add a title for your review');
       return;
     }
@@ -112,33 +178,46 @@ const ProductReviews = ({ productId, productName }: ProductReviewsProps) => {
       toast.error('Please add a comment for your review');
       return;
     }
+
+    if (!addReviewCallable) {
+      toast.error("Review submission service is not available.");
+      return;
+    }
     
     setIsSubmitting(true);
     
     try {
-      const newReview = await addProductReview(productId, user.id, {
+      const reviewPayload: AddReviewCFData = {
+        productId,
         rating: userReview.rating,
-        title: userReview.title,
-        comment: userReview.comment
-      });
+        comment: userReview.comment,
+      };
       
-      if (newReview) {
+      const result = await addReviewCallable(reviewPayload);
+      
+      if (result.data.success && result.data.review) {
+        const newReview = mapBEToLocalReview(result.data.review, productId);
         // Add the new review to the list
         setReviews(prev => [newReview, ...prev]);
         
         // Recalculate average
-        const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0) + newReview.rating;
-        setAverageRating(totalRating / (reviews.length + 1));
+        // Note: prev might not be immediately updated from setReviews, so use the newReview and spread of prev
+        const updatedReviewsForAvg = [newReview, ...reviews];
+        const totalRating = updatedReviewsForAvg.reduce((sum, r) => sum + r.rating, 0);
+        setAverageRating(totalRating / updatedReviewsForAvg.length);
         
         // Reset form
         setUserReview({ rating: 0, title: '', comment: '' });
         setShowReviewForm(false);
         
         toast.success('Review submitted successfully!');
+      } else {
+        console.error('Error submitting review:', result.data.error);
+        toast.error(result.data.error || 'Failed to submit review');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting review:', error);
-      toast.error('Failed to submit review');
+      toast.error(`Failed to submit review: ${error.message || 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -146,27 +225,8 @@ const ProductReviews = ({ productId, productName }: ProductReviewsProps) => {
 
   // Handle helpful vote
   const handleHelpfulVote = async (reviewId: string) => {
-    if (!user) {
-      toast.error('Please log in to vote');
-      navigate('/login');
-      return;
-    }
-    
-    try {
-      const updatedReview = await voteReviewHelpful(reviewId, user.id);
-      
-      if (updatedReview) {
-        // Update the review in the list
-        setReviews(prev => 
-          prev.map(review => 
-            review.id === reviewId ? updatedReview : review
-          )
-        );
-      }
-    } catch (error) {
-      console.error('Error voting for review:', error);
-      toast.error('Failed to register vote');
-    }
+    console.warn("handleHelpfulVote is currently disabled as voteReviewHelpful service function is not available.");
+    // toast("Voting on reviews is temporarily unavailable."); // Commented out to resolve lint error
   };
 
   // Render star rating

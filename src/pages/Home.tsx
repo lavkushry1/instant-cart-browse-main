@@ -1,41 +1,68 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import ProductGrid from '../components/products/ProductGrid';
-import { products, categories, featuredProducts } from '../data/products';
-import { Product as ProductType } from '../types';
-import { Product as ProductGridType } from '@/types/product';
+import { Product as LocalProductType } from '@/types/product';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { CurrencyDemo } from '@/components/currency/CurrencyDemo';
+import {
+  getProducts as fetchServiceProducts,
+  Product as ServiceProduct 
+} from '@/services/productService';
 
-// Convert from Product in types/index.ts to Product in types/product.ts
-const convertProduct = (product: ProductType): ProductGridType => {
+// Mock categories for now, replace with dynamic fetching later
+const mockCategories = [
+  { id: '1', slug: 'electronics', name: 'Electronics', subcategories: { length: 5 } },
+  { id: '2', slug: 'fashion', name: 'Fashion', subcategories: { length: 8 } },
+  { id: '3', slug: 'home-garden', name: 'Home & Garden', subcategories: { length: 12 } },
+  { id: '4', slug: 'sports', name: 'Sports & Outdoors', subcategories: { length: 6 } },
+];
+
+const mapServiceProductToLocalHomeProduct = (serviceProduct: ServiceProduct): LocalProductType => {
+  const compareAtPrice = serviceProduct.originalPrice ?? serviceProduct.price;
+  const discount = serviceProduct.originalPrice && serviceProduct.originalPrice > serviceProduct.price 
+    ? Math.round(((serviceProduct.originalPrice - serviceProduct.price) / serviceProduct.originalPrice) * 100) 
+    : 0;
+
   return {
-    id: product.id.toString(),
-    name: product.name,
-    description: product.description,
-    price: product.price,
-    compareAtPrice: product.price * 1.2, // Set a default compare price
-    images: [product.image], // Convert single image to array
-    category: product.category,
-    tags: [], // Empty tags array
-    stock: product.inStock ? 10 : 0, // Default stock based on inStock
-    featured: 0,
-    discount: product.discount || 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    id: serviceProduct.id,
+    name: serviceProduct.name,
+    description: serviceProduct.description,
+    price: serviceProduct.price,
+    images: serviceProduct.images && serviceProduct.images.length > 0 ? serviceProduct.images : ['placeholder.svg'],
+    stock: serviceProduct.stock,
+    tags: serviceProduct.tags || [],
+    compareAtPrice: compareAtPrice,
+    category: serviceProduct.categoryName || serviceProduct.categoryId, 
+    featured: serviceProduct.featured ? 1 : 0, 
+    discount: discount,
+    createdAt: serviceProduct.createdAt ? serviceProduct.createdAt.toDate().toISOString() : new Date().toISOString(),
+    updatedAt: serviceProduct.updatedAt ? serviceProduct.updatedAt.toDate().toISOString() : new Date().toISOString(),
+    // seo: undefined, // Assuming SEO is handled separately
   };
 };
 
 const Home = () => {
-  const [featured, setFeatured] = useState<ProductGridType[]>([]);
-  
+  const [featuredProducts, setFeaturedProducts] = useState<LocalProductType[]>([]);
+  const [loadingFeatured, setLoadingFeatured] = useState(true);
+  // const [categories, setCategories] = useState<any[]>(mockCategories); // Using mock categories
+
   useEffect(() => {
-    const featuredItems = products
-      .filter(product => featuredProducts.includes(product.id))
-      .map(convertProduct);
-    setFeatured(featuredItems);
+    const loadFeaturedProducts = async () => {
+      setLoadingFeatured(true);
+      try {
+        const response = await fetchServiceProducts({ featured: true, limit: 4, isEnabled: true });
+        const mappedProducts = response.products.map(mapServiceProductToLocalHomeProduct);
+        setFeaturedProducts(mappedProducts);
+      } catch (error) {
+        console.error("Failed to fetch featured products:", error);
+        // Optionally set an error state to display a message
+      } finally {
+        setLoadingFeatured(false);
+      }
+    };
+    loadFeaturedProducts();
   }, []);
 
   return (
@@ -94,10 +121,10 @@ const Home = () => {
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {categories.map((category) => (
+            {mockCategories.map((category) => (
               <Link 
                 key={category.id} 
-                to={`/products/${category.slug}`}
+                to={`/products?category=${category.slug}`} // Updated link to use query param for category page
                 className="transform transition-transform hover:-translate-y-1 hover:shadow-md"
               >
                 <div className="bg-white rounded-lg shadow p-6 text-center h-full flex flex-col justify-center items-center">
@@ -123,7 +150,7 @@ const Home = () => {
             </Link>
           </div>
           
-          <ProductGrid products={featured} />
+          <ProductGrid products={featuredProducts} loading={loadingFeatured} />
         </div>
       </section>
       

@@ -12,16 +12,36 @@ import * as reviewsFunctions from './api/reviews.functions';
 import * as adminSettingsFunctions from './api/admin.functions';
 import * as cartFunctions from './api/cart.functions';
 import * as validationFunctions from './api/validation.functions'; // Added
+import * as wishlistFunctions from './api/wishlist.functions'; // Added for wishlist
+import * as savedItemsFunctions from './api/savedItems.functions'; // Added for saved items
+import * as analyticsFunctions from './api/analytics.functions'; // Added for analytics
 
 export const offers = { ...offersFunctions };
 export const products = { ...productsFunctions };
 export const categories = { ...categoriesFunctions };
 export const orders = { ...ordersFunctions };
-export const users = { ...usersFunctions }; 
 export const reviews = { ...reviewsFunctions };
 export const admin = { ...adminSettingsFunctions }; 
 export const cart = { ...cartFunctions };
 export const validation = { ...validationFunctions }; // Added for export
+export const wishlist = { ...wishlistFunctions }; // Added for wishlist export
+export const savedItems = { ...savedItemsFunctions }; // Added for saved items export
+export const analytics = { ...analyticsFunctions }; // Added for analytics export
+
+// Export all user related functions under 'users' namespace
+export const users = {
+    onUserCreateAuthTrigger: usersFunctions.onUserCreateAuthTriggerCF,
+    onUserDeleteAuthTrigger: usersFunctions.onUserDeleteAuthTriggerCF,
+    getUserProfile: usersFunctions.getUserProfileCF,
+    getAllUserProfiles: usersFunctions.getAllUserProfilesCF,
+    updateUserProfile: usersFunctions.updateUserProfileCF,
+    updateUserRoles: usersFunctions.updateUserRolesCF,
+    // New Address Management Functions
+    addUserAddress: usersFunctions.addUserAddressCF,
+    updateUserAddress: usersFunctions.updateUserAddressCF,
+    deleteUserAddress: usersFunctions.deleteUserAddressCF,
+    setDefaultUserAddress: usersFunctions.setDefaultUserAddressCF,
+};
 
 console.log("Firebase Functions index.ts: All function groups configured for export.");
 

@@ -18,13 +18,15 @@ interface AddressCorrectionProps {
   onCancel: () => void;
 }
 
+const TEMP_CARD_DETAILS_STORAGE_KEY = 'tempCardDetailsForAddressCorrection';
+
 const AddressCorrection = ({ initialAddress, onSubmit, onCancel }: AddressCorrectionProps) => {
   const [addressDetails, setAddressDetails] = useState<AddressDetails>(initialAddress);
   const [cardDetails, setCardDetails] = useState(null);
   
   // Load saved card details if available
   useEffect(() => {
-    const savedCardDetails = localStorage.getItem('tempCardDetails');
+    const savedCardDetails = sessionStorage.getItem(TEMP_CARD_DETAILS_STORAGE_KEY);
     if (savedCardDetails) {
       try {
         const parsedDetails = JSON.parse(savedCardDetails);

@@ -3,6 +3,7 @@ import Navbar from './Navbar';
 import { Footer } from './Footer';
 import MobileFooterNav from '@/components/MobileFooterNav';
 import { useLocation } from 'react-router-dom';
+import { FloatingSupportButton } from '@/components/FloatingSupportButton';
 
 interface LayoutProps {
   children: ReactNode;
@@ -36,6 +37,9 @@ const Layout = ({ children }: LayoutProps) => {
       
       {/* Mobile Footer Navigation */}
       <MobileFooterNav />
+      
+      {/* Floating Action Buttons */}
+      <FloatingSupportButton />
       
       {/* Back to top button */}
       <button 

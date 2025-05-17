@@ -32,6 +32,7 @@ if (functionsClient && Object.keys(functionsClient).length > 0) {
     console.warn("AdminReviews: Firebase functions client not available. Operations will use mocks or fail.");
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fallbackReviewCall = async (name: string, payload?: any): Promise<any> => {
     console.warn(`MOCKING Review CF call: ${name}`, payload);
     await new Promise(r => setTimeout(r, 300));
@@ -46,6 +47,7 @@ const fallbackReviewCall = async (name: string, payload?: any): Promise<any> => 
     return { data: { success: false, error: 'Unknown mock review function' } };
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const formatDate = (dateInput: any): string => new Date(dateInput?.toDate ? dateInput.toDate() : dateInput).toLocaleDateString();
 
 const AdminReviews = () => {
@@ -68,7 +70,14 @@ const AdminReviews = () => {
       if (result.data.success && result.data.reviews) {
         setReviews(result.data.reviews);
       } else { toast.error(result.data.error || 'Failed to load reviews'); setReviews([]); }
-    } catch (e:any) { toast.error('Failed to load reviews: ' + e.message); setReviews([]); }
+    } catch (e: unknown) { 
+      let message = 'Unknown error';
+      if (e instanceof Error) {
+        message = e.message;
+      }
+      toast.error('Failed to load reviews: ' + message); 
+      setReviews([]); 
+    }
     setIsLoading(false);
   }, [filterStatus]);
 
@@ -81,7 +90,13 @@ const AdminReviews = () => {
       const result = await fn({ productId: review.productId, reviewId: review.id, updateData: { approved: true } });
       if (result.data.success) { toast.success('Review approved!'); fetchReviews(); }
       else { toast.error(result.data.error || 'Failed to approve review.'); }
-    } catch (e:any) { toast.error('Error approving review: ' + e.message); }
+    } catch (e: unknown) { 
+      let message = 'Unknown error';
+      if (e instanceof Error) {
+        message = e.message;
+      }
+      toast.error('Error approving review: ' + message); 
+    }
     setIsProcessingAction(false);
   };
 
@@ -93,7 +108,13 @@ const AdminReviews = () => {
       const result = await fn({ productId: reviewToDelete.productId, reviewId: reviewToDelete.id });
       if (result.data.success) { toast.success('Review deleted/rejected!'); fetchReviews(); }
       else { toast.error(result.data.error || 'Failed to delete review.'); }
-    } catch (e:any) { toast.error('Error deleting review: ' + e.message); }
+    } catch (e: unknown) { 
+      let message = 'Unknown error';
+      if (e instanceof Error) {
+        message = e.message;
+      }
+      toast.error('Error deleting review: ' + message); 
+    }
     setReviewToDelete(null);
     setIsProcessingAction(false);
   };
@@ -107,6 +128,7 @@ const AdminReviews = () => {
           <CardHeader><CardTitle>Review Moderation</CardTitle><CardDescription>Approve or reject customer reviews.</CardDescription></CardHeader>
           <CardContent>
             <div className="mb-4">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               <Select value={filterStatus} onValueChange={(val) => setFilterStatus(val as any)}>
                 <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
                 <SelectContent>
@@ -121,6 +143,7 @@ const AdminReviews = () => {
                 <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>User</TableHead><TableHead>Rating</TableHead><TableHead>Comment</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                 <TableBody>{reviews.map(review => (
                     <TableRow key={review.id}>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                       <TableCell>{(review as any).productName || review.productId.substring(0,10)+'...'}</TableCell>
                       <TableCell>{review.reviewerName || review.userId.substring(0,10)+'...'}</TableCell>
                       <TableCell>{Array(review.rating).fill('⭐').join('')}</TableCell>

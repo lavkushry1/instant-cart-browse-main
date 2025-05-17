@@ -70,9 +70,13 @@ const AdminProducts = () => {
         toast.error(result.data.error || 'Failed to load products');
         setProducts([]);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching products:', error);
-      toast.error(`Failed to load products: ${error.message || 'Unknown error'}`);
+      let message = 'Unknown error';
+      if (error instanceof Error) {
+        message = error.message;
+      }
+      toast.error(`Failed to load products: ${message}`);
       setProducts([]);
     } finally {
       setIsLoading(false);
@@ -92,7 +96,9 @@ const AdminProducts = () => {
       );
     }
     items.sort((a, b) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const aVal = (a as any)[sortField];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const bVal = (b as any)[sortField];
         if (typeof aVal === 'number' && typeof bVal === 'number') {
             return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
@@ -122,9 +128,13 @@ const AdminProducts = () => {
       } else {
         toast.error(result.data.error || 'Failed to delete product');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting product:', error);
-      toast.error(`Failed to delete product: ${error.message || 'Unknown error'}`);
+      let message = 'Unknown error';
+      if (error instanceof Error) {
+        message = error.message;
+      }
+      toast.error(`Failed to delete product: ${message}`);
     }
     setDeleteDialogOpen(false); setProductToDelete(null);
   };

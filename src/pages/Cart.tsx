@@ -22,14 +22,12 @@ const Cart = () => {
   const { 
     cart, 
     savedItems,
-    // isLoading: cartIsLoading, // Renamed to avoid conflict if useOffers has isLoading
     removeFromCart, 
     updateQuantity, 
     saveForLater,
-    moveItemToCart,
-    removeSaved,
-    clearCartItems,
-    // getCartTotals // This will be replaced by calculations from useOffers
+    moveSavedItemToCart,
+    removeSavedItem,
+    clearCart,
   } = useCart();
 
   const { calculateCartWithOffers, isLoadingOffers, errorOffers } = useOffers();
@@ -71,19 +69,24 @@ const Cart = () => {
   };
   
   const handleSaveForLater = (itemId: string) => {
-    saveForLater(itemId);
+    const cartItem = cart.find(item => item.id === itemId);
+    if (cartItem) {
+      saveForLater(itemId, cartItem.product);
+    } else {
+      console.warn("Product not found in cart for saving later:", itemId);
+    }
   };
   
   const handleMoveToCart = (itemId: string) => {
-    moveItemToCart(itemId);
+    moveSavedItemToCart(itemId);
   };
   
   const handleRemoveSaved = (itemId: string) => {
-    removeSaved(itemId);
+    removeSavedItem(itemId);
   };
   
   const handleClearCart = () => {
-    clearCartItems();
+    clearCart();
   };
   
   const handleCheckout = () => {

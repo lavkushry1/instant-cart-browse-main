@@ -155,7 +155,7 @@ const ThemeSettings = () => {
   };
 
   // Handle updating theme settings
-  const handleSettingChange = (category: string, key: string, value: any) => {
+  const handleSettingChange = (category: string, key: string, value: string | boolean) => {
     if (!selectedTheme) return;
 
     // Handle nested properties

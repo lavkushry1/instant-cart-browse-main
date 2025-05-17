@@ -1,6 +1,6 @@
 // functions/src/api/users.functions.ts
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import {
   upsertUserProfileBE,
   getUserProfileBE,
@@ -11,7 +11,12 @@ import {
   UserProfileCreationData, 
   UserProfileUpdateData,
   UserRole,
-  GetAllUserProfilesOptionsBE // Added
+  GetAllUserProfilesOptionsBE, // Added
+  addUserAddressBE, // Import new BE function
+  updateUserAddressBE, // Import new BE function
+  deleteUserAddressBE, // Import new BE function
+  setDefaultUserAddressBE, // Import new BE function
+  UserProfileAddressBE // Import type for address data
 } from '../../../src/services/userService'; // Adjust path
 
 const ensureAuthenticated = (context: functions.https.CallableContext): string => {
@@ -72,10 +77,11 @@ export const getUserProfileCF = functions.https.onCall(async (data, context) => 
       throw new functions.https.HttpsError('not-found', 'User profile not found.');
     }
     return { success: true, profile: userProfile };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in getUserProfileCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to get user profile.');
+    const message = error instanceof Error ? error.message : 'Failed to get user profile.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
@@ -92,10 +98,11 @@ export const getAllUserProfilesCF = functions.https.onCall(async (data: GetAllUs
         };
         const result = await getAllUserProfilesBE(options);
         return { success: true, ...result };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error in getAllUserProfilesCF:", error);
         if (error instanceof functions.https.HttpsError) throw error;
-        throw new functions.https.HttpsError('internal', error.message || 'Failed to get all user profiles.');
+        const message = error instanceof Error ? error.message : 'Failed to get all user profiles.';
+        throw new functions.https.HttpsError('internal', message);
     }
 });
 
@@ -108,10 +115,11 @@ export const updateUserProfileCF = functions.https.onCall(async (data: UserProfi
     }
     const updatedProfile = await updateUserProfileBE(userId, data);
     return { success: true, profile: updatedProfile };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in updateUserProfileCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to update user profile.');
+    const message = error instanceof Error ? error.message : 'Failed to update user profile.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
@@ -125,9 +133,76 @@ export const updateUserRolesCF = functions.https.onCall(async (data: { targetUse
     }
     await updateUserRolesBE(targetUserId, roles);
     return { success: true, message: `Roles updated for user ${targetUserId}.` };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in updateUserRolesCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to update user roles.');
+    const message = error instanceof Error ? error.message : 'Failed to update user roles.';
+    throw new functions.https.HttpsError('internal', message);
+  }
+});
+
+export const addUserAddressCF = functions.https.onCall(async (data: UserProfileAddressBE, context) => {
+  console.log("(Cloud Function) addUserAddressCF called with data:", data);
+  const userId = ensureAuthenticated(context);
+  try {
+    const newAddress = await addUserAddressBE(userId, data);
+    return { success: true, address: newAddress };
+  } catch (error: unknown) {
+    console.error("Error in addUserAddressCF:", error);
+    const message = error instanceof Error ? error.message : 'Failed to add address.';
+    throw new functions.https.HttpsError('internal', message);
+  }
+});
+
+export const updateUserAddressCF = functions.https.onCall(async (data: { addressId: string; addressData: Partial<UserProfileAddressBE> }, context) => {
+  console.log("(Cloud Function) updateUserAddressCF called with data:", data);
+  const userId = ensureAuthenticated(context);
+  try {
+    const { addressId, addressData } = data;
+    if (!addressId || !addressData || Object.keys(addressData).length === 0) {
+      throw new functions.https.HttpsError('invalid-argument', 'Address ID and update data are required.');
+    }
+    const updatedAddress = await updateUserAddressBE(userId, addressId, addressData);
+    return { success: true, address: updatedAddress };
+  } catch (error: unknown) {
+    console.error("Error in updateUserAddressCF:", error);
+    const message = error instanceof Error ? error.message : 'Failed to update address.';
+    throw new functions.https.HttpsError('internal', message);
+  }
+});
+
+export const deleteUserAddressCF = functions.https.onCall(async (data: { addressId: string }, context) => {
+  console.log("(Cloud Function) deleteUserAddressCF called with data:", data);
+  const userId = ensureAuthenticated(context);
+  try {
+    const { addressId } = data;
+    if (!addressId) {
+      throw new functions.https.HttpsError('invalid-argument', 'Address ID is required.');
+    }
+    await deleteUserAddressBE(userId, addressId);
+    return { success: true, message: 'Address deleted successfully.' };
+  } catch (error: unknown) {
+    console.error("Error in deleteUserAddressCF:", error);
+    const message = error instanceof Error ? error.message : 'Failed to delete address.';
+    throw new functions.https.HttpsError('internal', message);
+  }
+});
+
+export const setDefaultUserAddressCF = functions.https.onCall(async (data: { addressId: string }, context) => {
+  console.log("(Cloud Function) setDefaultUserAddressCF called with data:", data);
+  const userId = ensureAuthenticated(context);
+  try {
+    const { addressId } = data;
+    if (!addressId) {
+      throw new functions.https.HttpsError('invalid-argument', 'Address ID is required.');
+    }
+    await setDefaultUserAddressBE(userId, addressId);
+    // It's good practice to return the updated user profile (with new default address) or at least all addresses
+    // For now, just success. Client should refetch profile or manage state optimistically.
+    return { success: true, message: 'Default address set successfully.' };
+  } catch (error: unknown) {
+    console.error("Error in setDefaultUserAddressCF:", error);
+    const message = error instanceof Error ? error.message : 'Failed to set default address.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });

@@ -1,17 +1,22 @@
 // functions/src/api/reviews.functions.ts
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import {
-  createReviewBE,
-  getReviewsForProductBE,
-  updateReviewBE,
-  deleteReviewBE,
-  getReviewsAdminBE, // Added
-  ReviewCreationData, 
-  ReviewUpdateData,
-  ProductReviewBE,
-  GetReviewsAdminOptionsBE // Added
-} from '../../../src/services/reviewService'; // Adjust path
+  // createReviewBE, // Removed
+  // getReviewsForProductBE, // Removed
+  // updateReviewBE, // Removed
+  // deleteReviewBE, // Removed
+  // getReviewsAdminBE, // Removed
+  // ReviewCreationData, // Removed
+  // ReviewUpdateData, // Removed
+  // ProductReviewBE, // Removed
+  // GetReviewsAdminOptionsBE, // Removed
+  addProductReviewBE,
+  getProductReviewsBE,
+  ProductReview,
+  GetProductReviewsOptionsBE
+} from '../../../src/services/productService'; // CORRECTED PATH
+import { adminInstance } from '../../../src/lib/firebaseAdmin'; // CORRECTED PATH - Changed to adminInstance
 
 const ensureAuthenticated = (context: functions.https.CallableContext): string => {
   if (!context.auth) {
@@ -29,7 +34,7 @@ const ensureAdmin = (context: functions.https.CallableContext): string => {
 };
 
 // Helper to get a single review for permission checks (can be expanded or moved to service layer)
-const getReviewByIdForPermissionCheckBE = async (productId: string, reviewId: string): Promise<ProductReviewBE | null> => {
+const getReviewByIdForPermissionCheckBE = async (productId: string, reviewId: string): Promise<ProductReview | null> => {
     // This is a simplified direct DB access for permission check, ideally part of reviewServiceBE
     // For now, this is a placeholder. In a real app, use a service function from reviewService.ts
     console.warn("getReviewByIdForPermissionCheckBE: Mock implementation for permission check.");
@@ -41,116 +46,71 @@ const getReviewByIdForPermissionCheckBE = async (productId: string, reviewId: st
     return Promise.resolve(null); // Placeholder
 };
 
-console.log("(Cloud Functions) reviews.functions.ts: Initializing with LIVE logic...");
+// Initialize Firebase Admin SDK if not already done (idempotent)
+adminInstance;
 
-export const createReviewCF = functions.https.onCall(async (data: { productId: string; reviewData: ReviewCreationData }, context) => {
-  console.log("(Cloud Function) createReviewCF called with data:", data);
-  const userId = ensureAuthenticated(context);
-  try {
-    const { productId, reviewData } = data;
-    if (!productId || !reviewData) {
-      throw new functions.https.HttpsError('invalid-argument', 'Product ID and review data are required.');
-    }
-    if (reviewData.userId !== userId) {
-        throw new functions.https.HttpsError('permission-denied', 'Cannot create review for another user.');
-    }
-    if (reviewData.rating < 1 || reviewData.rating > 5) {
-        throw new functions.https.HttpsError('invalid-argument', 'Rating must be between 1 and 5.');
-    }
-    const newReview = await createReviewBE(productId, reviewData);
-    return { success: true, review: newReview };
-  } catch (error: any) {
-    console.error("Error in createReviewCF:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to create review.');
-  }
-});
+console.log("(Cloud Functions) reviews.functions.ts: Initializing...");
 
-export const getReviewsForProductCF = functions.https.onRequest(async (req, res) => {
-  console.log("(Cloud Function) getReviewsForProductCF called for product:", req.query.productId);
-  try {
-    const productId = req.query.productId as string;
-    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
-    // const startAfter = req.query.startAfter; // TODO: Handle Firestore cursor stringification/parsing
-    if (!productId) {
-      res.status(400).send({ success: false, error: 'Product ID is required.' });
-      return;
-    }
-    const result = await getReviewsForProductBE(productId, limit /*, startAfterDoc */);
-    res.status(200).send({ success: true, ...result });
-  } catch (error: any) {
-    console.error("Error in getReviewsForProductCF:", error);
-    res.status(500).send({ success: false, error: error.message || 'Failed to get reviews.' });
-  }
-});
+interface AddReviewCFData {
+    productId: string;
+    rating: number;
+    comment?: string;
+}
 
-export const getReviewsAdminCF = functions.https.onCall(async (data: GetReviewsAdminOptionsBE | undefined, context) => {
-    console.log("(Cloud Function) getReviewsAdminCF called with data:", data);
-    ensureAdmin(context);
+export const addReviewCF = functions.https.onCall(async (data: AddReviewCFData, context) => {
+    console.log("(Cloud Function) addReviewCF called with data:", data);
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to add a review.');
+    }
+    if (!data.productId || typeof data.rating !== 'number' || data.rating < 1 || data.rating > 5) {
+        throw new functions.https.HttpsError('invalid-argument', 'Product ID and a valid rating (1-5) are required.');
+    }
+
+    const userId = context.auth.uid;
+    const reviewerName = context.auth.token.name || context.auth.token.email || 'Anonymous User';
+
     try {
-        const options: GetReviewsAdminOptionsBE = {
-            productId: data?.productId,
-            userId: data?.userId,
-            approved: data?.approved,
-            limit: data?.limit || 25,
-            startAfter: data?.startAfter,
-            sortBy: data?.sortBy || 'createdAt',
-            sortOrder: data?.sortOrder || 'desc',
-        };
-        const result = await getReviewsAdminBE(options);
-        return { success: true, ...result };
-    } catch (error: any) {
-        console.error("Error in getReviewsAdminCF:", error);
+        const reviewPayload = { rating: data.rating, comment: data.comment };
+        const newReview: ProductReview = await addProductReviewBE(data.productId, reviewPayload, userId, reviewerName);
+        return { success: true, review: newReview };
+    } catch (error: unknown) {
+        console.error("Error in addReviewCF:", error);
         if (error instanceof functions.https.HttpsError) throw error;
-        throw new functions.https.HttpsError('internal', error.message || 'Failed to get reviews for admin.');
+        const message = error instanceof Error ? error.message : 'Failed to add review.';
+        throw new functions.https.HttpsError('internal', message);
     }
 });
 
-export const updateReviewCF = functions.https.onCall(async (data: { productId: string; reviewId: string; updateData: ReviewUpdateData }, context) => {
-  console.log("(Cloud Function) updateReviewCF called with data:", data);
-  const currentUserId = ensureAuthenticated(context);
-  try {
-    const { productId, reviewId, updateData } = data;
-    if (!productId || !reviewId || !updateData || Object.keys(updateData).length === 0) {
-      throw new functions.https.HttpsError('invalid-argument', 'Product ID, Review ID, and valid update data are required.');
+interface GetProductReviewsCFData {
+    productId: string;
+    limit?: number;
+    startAfter?: any; // Simplified for now; client needs to send serializable cursor data
+}
+
+export const getProductReviewsCF = functions.https.onCall(async (data: GetProductReviewsCFData, context) => {
+    console.log("(Cloud Function) getProductReviewsCF called with data:", data);
+    if (!data.productId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Product ID is required.');
     }
 
-    // For proper permission check before update, you might need a getReviewByIdBE
-    // const reviewToUpdate = await getReviewByIdForPermissionCheckBE(productId, reviewId);
-    // if (!reviewToUpdate) throw new functions.https.HttpsError('not-found', 'Review not found.');
-    // if (reviewToUpdate.userId !== currentUserId && !context.auth?.token.admin) {
-    //   throw new functions.https.HttpsError('permission-denied', 'You do not have permission to update this review.');
-    // }
-    // This simplified version assumes the service layer or Firestore rules handle granular permission.
-    // Or, the admin always has rights, and users can only update their own via specific checks.
-
-    if (updateData.rating && (updateData.rating < 1 || updateData.rating > 5)) {
-        throw new functions.https.HttpsError('invalid-argument', 'Rating must be between 1 and 5 if provided.');
+    try {
+        const options: GetProductReviewsOptionsBE = {
+            limit: data.limit || 10,
+            // Full startAfter (DocumentSnapshot) handling from client to admin SDK is complex.
+            // Client would typically send specific values from the last doc to reconstruct cursor.
+            // options.startAfter = data.startAfter ? reconstructAdminSnapshot(data.startAfter) : undefined;
+        };
+        
+        const result = await getProductReviewsBE(data.productId, options);
+        
+        // Cannot send Admin SDK DocumentSnapshot directly to client.
+        // If pagination with cursors is needed, send serializable parts of result.lastVisible.
+        // For this version, returning reviews only. Client can use limit/offset or simpler cursor.
+        return { success: true, reviews: result.reviews }; 
+    } catch (error: unknown) {
+        console.error("Error in getProductReviewsCF:", error);
+        if (error instanceof functions.https.HttpsError) throw error;
+        const message = error instanceof Error ? error.message : 'Failed to get reviews.';
+        throw new functions.https.HttpsError('internal', message);
     }
-
-    const updatedReview = await updateReviewBE(productId, reviewId, updateData);
-    return { success: true, review: updatedReview };
-  } catch (error: any) {
-    console.error("Error in updateReviewCF:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to update review.');
-  }
-});
-
-export const deleteReviewCF = functions.https.onCall(async (data: { productId: string; reviewId: string }, context) => {
-  console.log("(Cloud Function) deleteReviewCF called with data:", data);
-  const currentUserId = ensureAuthenticated(context);
-  try {
-    const { productId, reviewId } = data;
-    if (!productId || !reviewId) {
-      throw new functions.https.HttpsError('invalid-argument', 'Product ID and Review ID are required.');
-    }
-    // Similar permission check as in updateReviewCF would be needed here for non-admins.
-    await deleteReviewBE(productId, reviewId);
-    return { success: true, message: 'Review deleted successfully.' };
-  } catch (error: any) {
-    console.error("Error in deleteReviewCF:", error);
-    if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to delete review.');
-  }
 });

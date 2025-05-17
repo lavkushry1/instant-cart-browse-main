@@ -1,5 +1,5 @@
 import { ReactNode, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link, useLocation, Outlet } from 'react-router-dom';
 import { 
   LayoutGrid, 
   Package, 
@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 
 interface AdminLayoutProps {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 const AdminLayout = ({ children }: AdminLayoutProps) => {
@@ -99,7 +99,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             </div>
             <div className="flex items-center space-x-2 ml-auto">
               <span className="text-sm font-medium hidden sm:inline-block">
-                {user.name}
+                {user.displayName || user.email}
               </span>
               <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
                 View Store
@@ -109,8 +109,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         </header>
 
         {/* Content */}
-        <main>
-          {children}
+        <main className="p-6 bg-slate-50 min-h-[calc(100vh-65px)]">
+          <Outlet />
         </main>
       </div>
     </div>

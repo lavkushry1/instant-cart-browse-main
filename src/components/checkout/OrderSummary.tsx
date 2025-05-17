@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Check, ChevronUp, ChevronDown, Tag } from "lucide-react"; // Added Tag icon
 
 // Define a more specific CartItem type if it's consistent with what CheckoutOrderSummaryWrapper provides
-interface DisplayCartItem {
+export interface DisplayCartItem {
   id: number | string;
   name: string;
   price: number; // This should be the original price per unit for display consistency
@@ -17,7 +17,7 @@ interface DisplayCartItem {
   // finalItemTotal?: number;
 }
 
-interface OrderSummaryProps {
+export interface OrderSummaryProps {
   cart: DisplayCartItem[];
   subtotal: number;       // Original subtotal before cart-wide discounts
   discount?: number;       // Total discount amount from offers

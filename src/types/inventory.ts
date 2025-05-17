@@ -143,7 +143,7 @@ export interface InventoryReport {
   id: string;
   name: string;
   type: ReportType;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
   createdBy: string;
   createdAt: string;
   downloadUrl?: string;

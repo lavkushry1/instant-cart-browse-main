@@ -2,6 +2,8 @@ import React from 'react';
 // Assuming you have an icon library or SVG icons
 // For example, using react-icons, you might import:
 // import { FiHome, FiGrid, FiShoppingCart, FiUser } from 'react-icons/fi';
+import { useCart } from '@/hooks/useCart'; // Import useCart
+import CartIcon from '../cart/CartIcon'; // Import CartIcon
 
 interface NavItem {
   id: string;
@@ -10,12 +12,12 @@ interface NavItem {
   path: string;
 }
 
-const navItems: NavItem[] = [
-  { id: 'home', label: 'Home', icon: <span className="text-2xl">🏠</span>, path: '/' }, // Replace with actual icons
-  { id: 'categories', label: 'Categories', icon: <span className="text-2xl">📚</span>, path: '/categories' },
-  { id: 'cart', label: 'Cart', icon: <span className="text-2xl">🛒</span>, path: '/cart' },
-  { id: 'profile', label: 'Profile', icon: <span className="text-2xl">👤</span>, path: '/account' },
-];
+// const navItems: NavItem[] = [ // Comment out or remove original static navItems
+//   { id: 'home', label: 'Home', icon: <span className="text-2xl">🏠</span>, path: '/' },
+//   { id: 'categories', label: 'Categories', icon: <span className="text-2xl">📚</span>, path: '/categories' },
+//   { id: 'cart', label: 'Cart', icon: <span className="text-2xl">🛒</span>, path: '/cart' },
+//   { id: 'profile', label: 'Profile', icon: <span className="text-2xl">👤</span>, path: '/account' },
+// ];
 
 interface BottomNavBarProps {
   activePath?: string;
@@ -23,6 +25,9 @@ interface BottomNavBarProps {
 }
 
 const BottomNavBar: React.FC<BottomNavBarProps> = ({ activePath, onNavigate }) => {
+  const { getCartTotals } = useCart();
+  const { itemsCount } = getCartTotals();
+
   // In a real app, you'd use a routing library (like React Router) to get the current path.
   const currentPath = activePath || (typeof window !== 'undefined' ? window.location.pathname : '/');
 
@@ -34,6 +39,14 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ activePath, onNavigate }) =
       window.location.href = path;
     }
   };
+
+  // Define navItems inside the component so it can access itemsCount
+  const navItems: NavItem[] = [
+    { id: 'home', label: 'Home', icon: <span className="text-2xl">🏠</span>, path: '/' },
+    { id: 'categories', label: 'Categories', icon: <span className="text-2xl">📚</span>, path: '/categories' },
+    { id: 'cart', label: 'Cart', icon: <CartIcon itemCount={itemsCount} />, path: '/cart' }, // Use CartIcon here
+    { id: 'profile', label: 'Profile', icon: <span className="text-2xl">👤</span>, path: '/account' },
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white shadow-t-md border-t border-gray-200 md:hidden z-50">

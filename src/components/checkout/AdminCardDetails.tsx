@@ -6,196 +6,121 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter }
 import { toast } from 'sonner';
 import { Eye, EyeOff, Copy, Lock, ShieldAlert } from 'lucide-react';
 
-interface CardDetails {
-  cardNumber: string;
-  cardName: string;
-  expiry: string;
-  cvv: string;
-}
-
-const AdminCardDetails = () => {
-  const [savedCards, setSavedCards] = useState<CardDetails[]>([]);
-  const [adminPassword, setAdminPassword] = useState('');
+const AdminCardDetails: React.FC = () => {
+  const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [showCardDetails, setShowCardDetails] = useState(false);
-  
-  // Load saved card details
+  const [cardDetails, setCardDetails] = useState<{ cardNumber: string; cardName: string; expiry: string; cvv: string } | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+
+  const DEMO_PASSWORD = 'admin123'; // As per requirements
+  const CARD_DETAILS_KEY = 'adminSavedCardDetails'; // Key used in CreditCardForm.tsx
+
   useEffect(() => {
     if (isAuthenticated) {
-      const savedCardDetails = localStorage.getItem('adminSavedCardDetails');
-      if (savedCardDetails) {
-        try {
-          const parsedDetails = JSON.parse(savedCardDetails);
-          // Handle both single card and array of cards
-          if (Array.isArray(parsedDetails)) {
-            setSavedCards(parsedDetails);
-          } else {
-            setSavedCards([parsedDetails]);
-          }
-        } catch (error) {
-          console.error('Failed to parse saved card details');
-          toast.error('Error loading saved card details');
+      try {
+        const storedDetails = localStorage.getItem(CARD_DETAILS_KEY);
+        if (storedDetails) {
+          setCardDetails(JSON.parse(storedDetails));
+        } else {
+          toast.info('No card details found in demo storage.');
         }
+      } catch (error) {
+        toast.error('Failed to parse stored card details.');
+        console.error("Error parsing card details from localStorage:", error);
       }
     }
   }, [isAuthenticated]);
-  
-  // Authenticate admin
-  const handleAuthenticate = (e: React.FormEvent) => {
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // For demo purposes, use a simple password "admin123"
-    if (adminPassword === 'admin123') {
+    if (password === DEMO_PASSWORD) {
       setIsAuthenticated(true);
-      toast.success('Admin authenticated successfully');
+      toast.success('Admin access granted.');
     } else {
-      toast.error('Invalid admin password');
+      toast.error('Incorrect admin password.');
     }
   };
-  
-  // Copy card details to clipboard
-  const handleCopyCard = (card: CardDetails) => {
-    const cardInfo = `
-Card Number: ${card.cardNumber}
-Cardholder: ${card.cardName}
-Expiry: ${card.expiry}
-CVV: ${card.cvv}
-    `;
-    
-    navigator.clipboard.writeText(cardInfo.trim())
-      .then(() => toast.success('Card details copied to clipboard'))
-      .catch(() => toast.error('Failed to copy card details'));
+
+  const handleCopyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+      .then(() => toast.success('Copied to clipboard!'))
+      .catch(err => toast.error('Failed to copy.'));
   };
-  
-  // Log out
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setAdminPassword('');
-    setShowCardDetails(false);
-  };
-  
-  // Toggle showing masked/unmasked card details
-  const toggleShowCardDetails = () => {
-    setShowCardDetails(prev => !prev);
-  };
-  
-  // Mask card number except last 4 digits
-  const maskCardNumber = (cardNumber: string) => {
-    const cleanNumber = cardNumber.replace(/\s/g, '');
-    const lastFour = cleanNumber.slice(-4);
-    const maskedPart = '*'.repeat(cleanNumber.length - 4);
-    return maskedPart + lastFour;
-  };
-  
-  return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <Lock className="w-5 h-5 mr-2" />
-          Admin Card Details
-        </CardTitle>
-        <CardDescription>
-          Secure access to stored payment information
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent>
-        {!isAuthenticated ? (
-          <form onSubmit={handleAuthenticate} className="space-y-4">
-            <div>
-              <Label htmlFor="adminPassword">Admin Password</Label>
-              <Input 
-                id="adminPassword"
-                type="password"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                required
-              />
-            </div>
-            
-            <Button type="submit" className="w-full">
-              Authenticate
-            </Button>
-          </form>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-medium">Stored Card Details</h3>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={toggleShowCardDetails}
-              >
-                {showCardDetails ? (
-                  <><EyeOff className="w-4 h-4 mr-2" /> Hide</>
-                ) : (
-                  <><Eye className="w-4 h-4 mr-2" /> Show</>
-                )}
-              </Button>
-            </div>
-            
-            {savedCards.length === 0 ? (
-              <p className="text-sm text-gray-500">No card details stored yet.</p>
-            ) : (
-              <div className="space-y-4">
-                {savedCards.map((card, index) => (
-                  <div key={index} className="border rounded-md p-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium">Card Number</span>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleCopyCard(card)}
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <p className="font-mono">
-                        {showCardDetails ? card.cardNumber : maskCardNumber(card.cardNumber)}
-                      </p>
-                      
-                      <div className="grid grid-cols-2 gap-4 mt-2">
-                        <div>
-                          <span className="text-sm font-medium">Cardholder</span>
-                          <p>{card.cardName}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium">Expiry</span>
-                          <p>{card.expiry}</p>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <span className="text-sm font-medium">CVV</span>
-                        <p>{showCardDetails ? card.cvv : '***'}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            <div className="mt-4 flex items-center text-amber-600 text-sm">
-              <ShieldAlert className="w-4 h-4 mr-2" />
-              <span>This data is sensitive. Handle with care.</span>
-            </div>
+
+  if (!isAuthenticated) {
+    return (
+      <div className="p-4 border rounded-lg shadow-sm bg-white">
+        <h3 className="text-lg font-semibold mb-3">Admin Access - Card Details (DEMO)</h3>
+        <form onSubmit={handlePasswordSubmit} className="space-y-3">
+          <div>
+            <Label htmlFor="admin-password">Admin Password</Label>
+            <Input 
+              id="admin-password" 
+              type="password" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+            />
           </div>
-        )}
-      </CardContent>
+          <Button type="submit" className="w-full">Login</Button>
+        </form>
+      </div>
+    );
+  }
+
+  if (!cardDetails) {
+    return (
+      <div className="p-4 border rounded-lg shadow-sm bg-white">
+        <h3 className="text-lg font-semibold">Admin - Stored Card Details (DEMO)</h3>
+        <p>No card details available in demo storage.</p>
+      </div>
+    );
+  }
+
+  const maskedCardNumber = `Card No: ${cardDetails.cardNumber.slice(0, 4)} **** **** ${cardDetails.cardNumber.slice(-4)}`;
+
+  return (
+    <div className="p-4 border rounded-lg shadow-sm bg-white space-y-4">
+      <h3 className="text-lg font-semibold">Admin - Stored Card Details (DEMO)</h3>
+      <p className="text-xs text-red-600">Warning: This is for DEMO purposes only. NEVER store or display full card details like this in a real application.</p>
       
-      {isAuthenticated && (
-        <CardFooter>
-          <Button 
-            variant="outline" 
-            onClick={handleLogout}
-            className="w-full"
-          >
-            Log Out
-          </Button>
-        </CardFooter>
-      )}
-    </Card>
+      <div>
+        <Label>Cardholder Name</Label>
+        <div className="flex items-center justify-between p-2 border rounded bg-gray-50">
+          <span>{cardDetails.cardName}</span>
+          <Button variant="ghost" size="sm" onClick={() => handleCopyToClipboard(cardDetails.cardName)}><Copy className="w-4 h-4" /></Button>
+        </div>
+      </div>
+
+      <div>
+        <Label>Card Number</Label>
+        <div className="flex items-center justify-between p-2 border rounded bg-gray-50">
+          <span>{showDetails ? cardDetails.cardNumber : maskedCardNumber}</span>
+          <Button variant="ghost" size="sm" onClick={() => handleCopyToClipboard(cardDetails.cardNumber)}><Copy className="w-4 h-4" /></Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Expiry Date</Label>
+          <div className="flex items-center justify-between p-2 border rounded bg-gray-50">
+            <span>{cardDetails.expiry}</span>
+            <Button variant="ghost" size="sm" onClick={() => handleCopyToClipboard(cardDetails.expiry)}><Copy className="w-4 h-4" /></Button>
+          </div>
+        </div>
+        <div>
+          <Label>CVV</Label>
+          <div className="flex items-center justify-between p-2 border rounded bg-gray-50">
+            <span>{showDetails ? cardDetails.cvv : '***'}</span>
+            <Button variant="ghost" size="sm" onClick={() => handleCopyToClipboard(cardDetails.cvv)}><Copy className="w-4 h-4" /></Button>
+          </div>
+        </div>
+      </div>
+
+      <Button variant="outline" onClick={() => setShowDetails(!showDetails)} className="w-full">
+        {showDetails ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />} 
+        {showDetails ? 'Hide Full Details' : 'Show Full Details'}
+      </Button>
+    </div>
   );
 };
 

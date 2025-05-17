@@ -18,9 +18,14 @@ import { Order, OrderStatus, GetOrdersOptionsBE, OrderUpdateData } from '@/servi
 import { functionsClient } from '@/lib/firebaseClient';
 import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions';
 
-let getAllOrdersAdminCF: HttpsCallable<GetOrdersOptionsBE | undefined, HttpsCallableResult<{ success: boolean; orders?: Order[]; totalCount?: number; error?: string }>> | undefined;
-let updateOrderStatusAdminCF: HttpsCallable<{ orderId: string; newStatus: OrderStatus; trackingNumber?: string; shippingCarrier?: string }, HttpsCallableResult<{ success: boolean; order?: Order; error?: string }>> | undefined;
-let deleteOrderAdminCF: HttpsCallable<{ orderId: string }, HttpsCallableResult<{ success: boolean; message?: string; error?: string }>> | undefined;
+// Define direct response types for Cloud Functions
+interface GetAllOrdersAdminResponse { success: boolean; orders?: Order[]; totalCount?: number; error?: string; }
+interface UpdateOrderStatusAdminResponse { success: boolean; order?: Order; error?: string; }
+interface DeleteOrderAdminResponse { success: boolean; message?: string; error?: string; }
+
+let getAllOrdersAdminCF: HttpsCallable<GetOrdersOptionsBE | undefined, GetAllOrdersAdminResponse> | undefined;
+let updateOrderStatusAdminCF: HttpsCallable<{ orderId: string; newStatus: OrderStatus; trackingNumber?: string; shippingCarrier?: string }, UpdateOrderStatusAdminResponse> | undefined;
+let deleteOrderAdminCF: HttpsCallable<{ orderId: string }, DeleteOrderAdminResponse> | undefined;
 
 if (functionsClient && Object.keys(functionsClient).length > 0) {
   try {
@@ -37,6 +42,7 @@ if (functionsClient && Object.keys(functionsClient).length > 0) {
 }
 
 // Fallback mock
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fallbackOrderCall = async (name: string, payload?: any): Promise<any> => {
     console.warn(`MOCKING Order CF call: ${name}`, payload);
     await new Promise(r => setTimeout(r, 300));
@@ -46,6 +52,7 @@ const fallbackOrderCall = async (name: string, payload?: any): Promise<any> => {
     return { data: { success: false, error: 'Unknown mock order function' } };
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const formatDate = (dateInput: any): string => { /* ... */ return new Date(dateInput?.toDate ? dateInput.toDate() : dateInput).toLocaleString(); };
 const getStatusBadge = (status: OrderStatus) => { /* ... */ return <Badge>{status}</Badge>; };
 const getPaymentBadge = (status: string) => { /* ... */ return <Badge variant="secondary">{status}</Badge>; };
@@ -71,9 +78,13 @@ const AdminOrders = () => {
     const options: GetOrdersOptionsBE = { orderStatus: statusFilter === 'all' ? undefined : statusFilter, sortBy: 'createdAt', sortOrder: 'desc' };
     try {
       const fn = getAllOrdersAdminCF || ((opts: GetOrdersOptionsBE | undefined) => fallbackOrderCall('getAllOrdersAdminCF', opts));
-      const result = await fn(options);
-      if (result.data.success && result.data.orders) setOrders(result.data.orders);
-      else { toast.error(result.data.error || 'Failed to load orders'); setOrders([]); }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: HttpsCallableResult<any> = await fn(options);
+      const responseData = result.data as GetAllOrdersAdminResponse;
+
+      if (responseData.success && responseData.orders) setOrders(responseData.orders);
+      else { toast.error(responseData.error || 'Failed to load orders'); setOrders([]); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e:any) { toast.error('Failed to load orders: ' + e.message); setOrders([]); }
     setIsLoading(false);
   }, [statusFilter]);
@@ -86,9 +97,13 @@ const AdminOrders = () => {
     if (!orderToDelete) return;
     const fn = deleteOrderAdminCF || (() => fallbackOrderCall('deleteOrderCF', { orderId: orderToDelete.id }));
     try {
-      const result = await fn({ orderId: orderToDelete.id });
-      if (result.data.success) { toast.success('Order deleted!'); fetchOrders(); }
-      else toast.error(result.data.error || 'Delete failed.');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: HttpsCallableResult<any> = await fn({ orderId: orderToDelete.id });
+      const responseData = result.data as DeleteOrderAdminResponse;
+
+      if (responseData.success) { toast.success('Order deleted!'); fetchOrders(); }
+      else toast.error(responseData.error || 'Delete failed.');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e:any) { toast.error('Delete error: ' + e.message); }
     setDialogsOpen(prev => ({...prev, delete: false})); setOrderToDelete(null);
   };
@@ -97,9 +112,13 @@ const AdminOrders = () => {
     if (!orderToUpdate) return;
     const fn = updateOrderStatusAdminCF || (() => fallbackOrderCall('updateOrderStatusCF', { orderId: orderToUpdate!.id, newStatus }));
     try {
-      const result = await fn({ orderId: orderToUpdate!.id, newStatus });
-      if (result.data.success) { toast.success('Status updated to ' + newStatus); fetchOrders(); }
-      else toast.error(result.data.error || 'Update failed.');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: HttpsCallableResult<any> = await fn({ orderId: orderToUpdate!.id, newStatus });
+      const responseData = result.data as UpdateOrderStatusAdminResponse;
+
+      if (responseData.success) { toast.success('Status updated to ' + newStatus); fetchOrders(); }
+      else toast.error(responseData.error || 'Update failed.');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e:any) { toast.error('Update error: ' + e.message); }
     setDialogsOpen(prev => ({...prev, statusUpdate: false})); setOrderToUpdate(null);
   };
@@ -129,6 +148,7 @@ const AdminOrders = () => {
                 <TableBody>{processedOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">#{order.id.substring(0,8)}...</TableCell>
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     <TableCell>{(order as any).customerName || order.customerEmail}</TableCell>
                     <TableCell>{getStatusBadge(order.orderStatus)}</TableCell>
                     <TableCell>{getPaymentBadge(order.paymentStatus)}</TableCell>

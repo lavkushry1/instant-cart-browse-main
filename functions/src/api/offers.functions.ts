@@ -1,6 +1,6 @@
 // functions/src/api/offers.functions.ts
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import {
   createOfferBE,
   getOfferByIdBE,
@@ -34,10 +34,11 @@ export const createOfferCF = functions.https.onCall(async (data: OfferCreationDa
     }
     const newOffer = await createOfferBE(data);
     return { success: true, offer: newOffer };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in createOfferCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to create offer.');
+    const message = error instanceof Error ? error.message : 'Failed to create offer.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
@@ -55,9 +56,10 @@ export const getOfferByIdCF = functions.https.onRequest(async (req, res) => {
     } else {
       res.status(404).send({ success: false, error: 'Offer not found.' });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in getOfferByIdCF:", error);
-    res.status(500).send({ success: false, error: error.message || 'Failed to get offer.' });
+    const message = error instanceof Error ? error.message : 'Failed to get offer.';
+    res.status(500).send({ success: false, error: message });
   }
 });
 
@@ -67,9 +69,24 @@ export const getAllOffersCF = functions.https.onRequest(async (req, res) => {
     // TODO: Add pagination, filtering (e.g. by enabled status for public view) from req.query if needed
     const offers = await getAllOffersBE();
     res.status(200).send({ success: true, offers });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in getAllOffersCF:", error);
-    res.status(500).send({ success: false, error: error.message || 'Failed to get all offers.' });
+    const message = error instanceof Error ? error.message : 'Failed to get all offers.';
+    res.status(500).send({ success: false, error: message });
+  }
+});
+
+export const getAllOffersAdminCF = functions.https.onCall(async (_data, context) => {
+  console.log("(Cloud Function) getAllOffersAdminCF called.");
+  ensureAdmin(context);
+  try {
+    const offers = await getAllOffersBE();
+    return { success: true, offers };
+  } catch (error: unknown) {
+    console.error("Error in getAllOffersAdminCF:", error);
+    if (error instanceof functions.https.HttpsError) throw error;
+    const message = error instanceof Error ? error.message : 'Failed to get all offers for admin.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
@@ -84,10 +101,11 @@ export const updateOfferCF = functions.https.onCall(async (data: { offerId: stri
     // TODO: Add server-side validation for 'updateData'
     const updatedOffer = await updateOfferBE(offerId, updateData);
     return { success: true, offer: updatedOffer };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in updateOfferCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to update offer.');
+    const message = error instanceof Error ? error.message : 'Failed to update offer.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });
 
@@ -101,9 +119,10 @@ export const deleteOfferCF = functions.https.onCall(async (data: { offerId: stri
     }
     await deleteOfferBE(offerId);
     return { success: true, message: 'Offer deleted successfully.' };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in deleteOfferCF:", error);
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', error.message || 'Failed to delete offer.');
+    const message = error instanceof Error ? error.message : 'Failed to delete offer.';
+    throw new functions.https.HttpsError('internal', message);
   }
 });

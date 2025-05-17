@@ -75,15 +75,7 @@ export interface HomepageLayoutSettings {
   sections: HomepageSection[];
 }
 
-export interface HomepageSection {
-  id: string;
-  type: 'hero' | 'featured-products' | 'categories' | 'banner' | 'testimonials' | 'newsletter' | 'custom';
-  title: string;
-  subtitle?: string;
-  visible: boolean;
-  settings: any; // Specific settings based on section type
-}
-
+// Define settings interfaces for each section type
 export interface HeroSettings {
   imageUrl: string;
   heading: string;
@@ -104,6 +96,58 @@ export interface FeaturedProductsSettings {
   showPrice: boolean;
   showRating: boolean;
 }
+
+export interface CategoriesSettings {
+  title: string;
+  categoryIds: string[];
+  displayStyle: 'grid' | 'list' | 'carousel';
+  showProductCount: boolean;
+}
+
+export interface BannerSettings {
+  imageUrl: string;
+  linkUrl?: string;
+  height?: 'auto' | 'fixed'; // Example, adjust as needed
+  fullWidth?: boolean;
+}
+
+export interface TestimonialsSettings {
+  title: string;
+  testimonials: Array<{ quote: string; author: string; source?: string; avatarUrl?: string; }>;
+  displayStyle: 'carousel' | 'grid';
+}
+
+export interface NewsletterSettings {
+  title: string;
+  description?: string;
+  placeholderText?: string;
+  submitButtonText?: string;
+}
+
+export interface CustomSectionSettings {
+  htmlContent?: string;
+  scriptSrc?: string; 
+  // Or more generally
+  config?: Record<string, unknown>; 
+}
+
+// Base interface for common section properties
+interface BaseHomepageSection {
+  id: string;
+  title: string;
+  subtitle?: string;
+  visible: boolean;
+}
+
+// Discriminated union for HomepageSection
+export type HomepageSection = 
+  | (BaseHomepageSection & { type: 'hero'; settings: HeroSettings; })
+  | (BaseHomepageSection & { type: 'featured-products'; settings: FeaturedProductsSettings; })
+  | (BaseHomepageSection & { type: 'categories'; settings: CategoriesSettings; })
+  | (BaseHomepageSection & { type: 'banner'; settings: BannerSettings; })
+  | (BaseHomepageSection & { type: 'testimonials'; settings: TestimonialsSettings; })
+  | (BaseHomepageSection & { type: 'newsletter'; settings: NewsletterSettings; })
+  | (BaseHomepageSection & { type: 'custom'; settings: CustomSectionSettings; });
 
 export interface SeasonalTheme {
   id: string;

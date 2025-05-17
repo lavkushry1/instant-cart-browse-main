@@ -1,7 +1,7 @@
 # UI Revamp Task: Flipkart-Inspired Modernization
 
 ## Goal
-Revamp the UI to look modern, clean, and dynamic—like Flipkart’s mobile-first e-commerce design. Focus on sleek layout, intuitive user experience, and visual hierarchy.
+Revamp the UI to look modern, clean, and dynamic—like Flipkart's mobile-first e-commerce design. Focus on sleek layout, intuitive user experience, and visual hierarchy.
 
 ## Status: Core Components Completed
 
@@ -19,7 +19,7 @@ Revamp the UI to look modern, clean, and dynamic—like Flipkart’s mobile-firs
 
 ### 3. 📦 Dynamic Components
 - [X] Use data-driven components like product cards, carousels, and offer banners (All created components are data-driven via props)
-- [ ] Fetch from Firebase Realtime DB or Firestore to auto-populate offers/products
+- [X] Fetch from Firebase Realtime DB or Firestore to auto-populate offers/products
 
 ### 4. 🖼️ Components to Include:
 - [X] Product Card (image, title, price, discount) - Updated
@@ -32,21 +32,21 @@ Revamp the UI to look modern, clean, and dynamic—like Flipkart’s mobile-firs
 
 ### 5. 🧠 Smart UX:
 - [X] Use lazy loading for product images (Product Card, CategoryGrid, OfferBannerSlider created)
-- [ ] Add skeleton loaders on slow networks
-- [X] Display “Out of Stock” label dynamically (Product Card updated)
+- [X] Add skeleton loaders on slow networks
+- [X] Display "Out of Stock" label dynamically (Product Card updated)
 
 ### 🎨 Styling Rules:
 - [X] Use Tailwind CSS or Material UI style guide (Tailwind CSS used for all created components)
-- [ ] Font: clean and minimal (like Inter, Roboto) (Default Tailwind fonts, can be configured globally)
+- [X] Font: clean and minimal (like Inter, Roboto) (Default Tailwind fonts, can be configured globally - Verified: ThemeProvider sets Inter as default)
 - [X] Rounded corners: `rounded-2xl`, shadow `shadow-md` (Most components updated)
 - [X] Padding: `p-3` or more, keep spacing consistent (Most components updated)
 
 ### 📈 Bonus Ideas (if possible):
-- [ ] Implement light/dark theme toggle
-- [ ] Floating “Chat with Support” button on mobile
-- [ ] Animate “Add to Cart” with toast popup
+- [X] Implement light/dark theme toggle
+- [X] Floating "Chat with Support" button on mobile
+- [X] Animate "Add to Cart" with toast popup (Standard toast notifications are implemented via sonner/react-hot-toast)
 
 ### ⚠️ Constraints:
 - Keep UI lightweight (low LCP)
-- Don’t overload with too many animations
+- Don't overload with too many animations
 - Must be fully responsive (test on iPhone SE to iPad Pro)

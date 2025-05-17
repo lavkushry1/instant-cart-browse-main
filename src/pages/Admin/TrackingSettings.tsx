@@ -574,7 +574,7 @@ const TrackingSettings = () => {
                           <Select
                             value={consent.styling?.position || 'bottom'}
                             onValueChange={(value) => handleConsentSettingsUpdate({ 
-                              styling: { ...consent.styling, position: value as any } 
+                              styling: { ...consent.styling, position: value as 'bottom' | 'top' | 'bottom-left' | 'bottom-right' } 
                             })}
                           >
                             <SelectTrigger id="banner-position">

@@ -55,6 +55,9 @@ All backend services and Cloud Functions have their Firebase SDK logic "activate
 -   [🟢] **All Cloud Functions**: SDK Activated and call live backend services.
     **Status: Entire backend (services + CFs) is structured with live Firebase SDK calls, ready for user's Firebase project config, deployment, and testing.**
 
+## Development Environment & Tooling
+-   [✅] Resolved `firebase-functions` module not found linting error in `functions/src/api/admin.functions.ts` by installing the package.
+
 ## Next Steps & Priorities
 
 1.  **USER ACTION: Firebase Project Setup & Configuration**:

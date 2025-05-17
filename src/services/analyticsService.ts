@@ -1,7 +1,7 @@
-import { Order } from '@/types/order';
-import { Product } from '@/types/product';
-import { getAllOrders } from './orderService';
-import { getAllProducts } from './productService';
+import { functionsClient } from '../lib/firebaseClient'; // Corrected path
+import { httpsCallable, HttpsCallableResult, HttpsCallable } from 'firebase/functions';
+import { Timestamp as ClientTimestamp } from 'firebase/firestore';
+import { Order } from '@/types/order'; // Assuming this uses ClientTimestamp
 import {
   AnalyticsData,
   CustomerInsight,
@@ -19,34 +19,24 @@ import {
   ReportExportOptions
 } from '@/types/analytics';
 
-// Helper function to get timestamp from either string or Date
-const getTimestamp = (date: string | Date): number => {
-  return typeof date === 'string' ? new Date(date).getTime() : date.getTime();
-};
+// Re-define types for Client context if they differ from BE, specifically Timestamps.
+// Or, use a generic type that can be <T extends Timestamp> client-side or admin-side.
 
-// Helper function to create Date object from string or Date
-const toDate = (date: string | Date): Date => {
-  return typeof date === 'string' ? new Date(date) : date;
-};
-
-// Time period options for analytics
 export type TimePeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'custom';
 
-export interface SalesSummary {
+export interface DateRangeClient {
+    startDate: ClientTimestamp | Date | string; // Flexible for input, converted before CF call
+    endDate: ClientTimestamp | Date | string;
+}
+
+export interface SalesSummaryClient {
   totalSales: number;
   totalOrders: number;
   averageOrderValue: number;
-  comparisonPeriod: {
-    totalSales: number;
-    totalOrders: number;
-    averageOrderValue: number;
-  };
-  salesGrowth: number;
-  ordersGrowth: number;
-  aovGrowth: number;
+  // Growth metrics would be calculated client-side if previous period data is also fetched or returned by CF
 }
 
-export interface ProductSummary {
+export interface ProductSummaryClient {
   totalProducts: number;
   lowStockProducts: number;
   outOfStockProducts: number;
@@ -58,369 +48,143 @@ export interface ProductSummary {
   }>;
 }
 
-export interface CustomerSummary {
+export interface CustomerSummaryClient {
   totalCustomers: number;
   newCustomers: number;
   returningCustomers: number;
-  customerGrowth: number;
 }
 
-export interface OrderStatusSummary {
+export interface OrderStatusSummaryClient {
   pending: number;
   processing: number;
   shipped: number;
   delivered: number;
   cancelled: number;
   returned: number;
+  paymentFailed: number;
   refunded: number;
 }
 
-export interface SalesByCategory {
+export interface SalesByCategoryClient {
   category: string;
   sales: number;
-  percentage: number;
+  orderCount: number;
 }
 
-export interface SalesByPaymentMethod {
+export interface SalesByPaymentMethodClient {
   method: string;
   sales: number;
-  percentage: number;
+  orderCount: number;
 }
 
-export interface DashboardData {
-  salesSummary: SalesSummary;
-  productSummary: ProductSummary;
-  customerSummary: CustomerSummary;
-  orderStatusSummary: OrderStatusSummary;
-  salesByCategory: SalesByCategory[];
-  salesByPaymentMethod: SalesByPaymentMethod[];
+// This DashboardData type is what the client-side components (AdminDashboard.tsx) will expect.
+// It should mirror DashboardDataBE but use ClientTimestamps where appropriate if dates are passed through.
+// For salesOverTime, the date is already a string from BE.
+// For recentOrders, OrderBE timestamps need conversion to ClientTimestamp if not already compatible.
+export interface DashboardDataClient {
+  salesSummary: SalesSummaryClient;
+  productSummary: ProductSummaryClient;
+  customerSummary: CustomerSummaryClient;
+  orderStatusSummary: OrderStatusSummaryClient;
+  salesByCategory: SalesByCategoryClient[];
+  salesByPaymentMethod: SalesByPaymentMethodClient[];
   salesOverTime: Array<{
     date: string;
     sales: number;
     orders: number;
   }>;
-  recentOrders: Order[];
+  recentOrders: Order[]; // Use the client Order type from @/types/order
 }
 
-/**
- * Get start and end dates for a given time period
- */
-const getDateRangeForPeriod = (period: TimePeriod, customRange?: DateRange): DateRange => {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
-  switch (period) {
-    case 'today':
-      return {
-        startDate: today,
-        endDate: now
-      };
-    case 'yesterday': {
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      return {
-        startDate: yesterday,
-        endDate: new Date(today.getTime() - 1)
-      };
+// --- Cloud Function Call ---
+
+let getDashboardDataCallable: HttpsCallable<
+  { timePeriod: TimePeriod; customRange?: { startDate: string; endDate: string } }, 
+  { success: boolean; data?: DashboardDataClient; error?: string }
+>;
+
+const initializeCallables = () => {
+    if (!functionsClient) {
+        console.error("Firebase functions client not available for analyticsService.");
+        return;
     }
-    case 'week': {
-      const weekStart = new Date(today);
-      weekStart.setDate(weekStart.getDate() - 7);
-      return {
-        startDate: weekStart,
-        endDate: now
-      };
+    if (!getDashboardDataCallable) {
+        getDashboardDataCallable = httpsCallable(functionsClient, 'analytics-getDashboardDataCF');
     }
-    case 'month': {
-      const monthStart = new Date(today);
-      monthStart.setMonth(monthStart.getMonth() - 1);
-      return {
-        startDate: monthStart,
-        endDate: now
-      };
-    }
-    case 'year': {
-      const yearStart = new Date(today);
-      yearStart.setFullYear(yearStart.getFullYear() - 1);
-      return {
-        startDate: yearStart,
-        endDate: now
-      };
-    }
-    case 'custom':
-      if (!customRange) {
-        throw new Error('Custom date range is required for custom period');
-      }
-      return customRange;
-    default:
-      return {
-        startDate: today,
-        endDate: now
-      };
-  }
 };
 
-/**
- * Get previous date range for comparison
- */
-const getPreviousDateRange = (dateRange: DateRange): DateRange => {
-  const { startDate, endDate } = dateRange;
-  const duration = getTimestamp(endDate) - getTimestamp(startDate);
-  
-  return {
-    startDate: new Date(getTimestamp(startDate) - duration),
-    endDate: new Date(getTimestamp(endDate) - duration)
-  };
-};
+// Ensure callables are initialized when the module loads or on first call
+// Be cautious with top-level initializeCallables() if it might run before Firebase app is fully ready.
+// A common pattern is to initialize on first use or within a useEffect in a component.
+// For a service, initializing on first use is safer.
 
-/**
- * Check if a date is within a date range
- */
-const isDateInRange = (date: Date, dateRange: DateRange): boolean => {
-  const dateTime = date.getTime();
-  return dateTime >= getTimestamp(dateRange.startDate) && dateTime <= getTimestamp(dateRange.endDate);
-};
-
-/**
- * Filter orders by date range
- */
-const filterOrdersByDateRange = (orders: Order[], dateRange: DateRange): Order[] => {
-  return orders.filter(order => {
-    const orderDate = new Date(order.createdAt);
-    return isDateInRange(orderDate, dateRange);
-  });
-};
-
-/**
- * Calculate percentage growth between two values
- */
-const calculateGrowth = (current: number, previous: number): number => {
-  if (previous === 0) return current > 0 ? 100 : 0;
-  return ((current - previous) / previous) * 100;
-};
-
-/**
- * Format date for chart display
- */
-const formatChartDate = (date: Date): string => {
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-};
-
-/**
- * Get daily data points for chart
- */
-const getDailyDataPoints = (orders: Order[], dateRange: DateRange): Array<{ date: string; sales: number; orders: number }> => {
-  const dataPoints: Array<{ date: Date; sales: number; orders: number }> = [];
-  const days = Math.ceil((getTimestamp(dateRange.endDate) - getTimestamp(dateRange.startDate)) / (1000 * 60 * 60 * 24));
-  
-  // Generate dates
-  for (let i = 0; i < days; i++) {
-    const date = new Date(getTimestamp(dateRange.startDate));
-    date.setDate(date.getDate() + i);
-    dataPoints.push({ date, sales: 0, orders: 0 });
-  }
-  
-  // Populate data
-  orders.forEach(order => {
-    const orderDate = new Date(order.createdAt);
-    const dataPoint = dataPoints.find(dp => 
-      dp.date.getDate() === orderDate.getDate() && 
-      dp.date.getMonth() === orderDate.getMonth() && 
-      dp.date.getFullYear() === orderDate.getFullYear()
-    );
-    
-    if (dataPoint) {
-      dataPoint.sales += order.total;
-      dataPoint.orders += 1;
-    }
-  });
-  
-  // Format dates for display
-  return dataPoints.map(dp => ({
-    date: formatChartDate(dp.date),
-    sales: dp.sales,
-    orders: dp.orders
-  }));
-};
-
-/**
- * Get unique customers from orders
- */
-const getUniqueCustomers = (orders: Order[]): string[] => {
-  const customerIds = new Set<string>();
-  
-  orders.forEach(order => {
-    if (order.userId) {
-      customerIds.add(order.userId);
-    }
-  });
-  
-  return Array.from(customerIds);
-};
-
-/**
- * Get dashboard data for given time period
- */
 export const getDashboardData = async (
   period: TimePeriod = 'month',
-  customRange?: DateRange
-): Promise<DashboardData> => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 800));
-  
+  customRange?: DateRangeClient
+): Promise<DashboardDataClient> => {
+  initializeCallables(); // Initialize on first use
+  if (!getDashboardDataCallable) {
+    throw new Error("Analytics function (getDashboardDataCallable) not initialized.");
+  }
+
+  console.log('(Service-Client) getDashboardData called for period:', period, 'customRange:', customRange);
+
+  let payloadRange;
+  if (customRange && customRange.startDate && customRange.endDate) {
+    // Convert Date/ClientTimestamp to ISO string for CF payload
+    const toISO = (date: ClientTimestamp | Date | string): string => {
+        if (typeof date === 'string') return date;
+        if (date instanceof ClientTimestamp) return date.toDate().toISOString();
+        return date.toISOString();
+    };
+    payloadRange = {
+        startDate: toISO(customRange.startDate),
+        endDate: toISO(customRange.endDate),
+    };
+  }
+
   try {
-    // Get date ranges
-    const dateRange = getDateRangeForPeriod(period, customRange);
-    const previousDateRange = getPreviousDateRange(dateRange);
+    const result = await getDashboardDataCallable({ timePeriod: period, customRange: payloadRange });
     
-    // Get data
-    const allOrders = await getAllOrders();
-    const allProducts = await getAllProducts();
+    if (!result.data.success || !result.data.data) {
+      console.error('Failed to get dashboard data from CF:', result.data.error || 'No data returned');
+      throw new Error(result.data.error || 'Failed to retrieve dashboard data.');
+    }
     
-    // Filter orders by current period and previous period
-    const currentPeriodOrders = filterOrdersByDateRange(allOrders, dateRange);
-    const previousPeriodOrders = filterOrdersByDateRange(allOrders, previousDateRange);
+    // The data from CF should be DashboardDataBE. We need to map it to DashboardDataClient.
+    // Key part: Convert admin.firestore.Timestamp in recentOrders to ClientTimestamp.
+    // Other parts of DashboardDataBE are numbers/strings/simple arrays and should map directly to DashboardDataClient fields.
+    const beData = result.data.data as any; // Cast to any for easier mapping temporarily
     
-    // Sales summary calculations
-    const currentTotalSales = currentPeriodOrders.reduce((sum, order) => sum + order.total, 0);
-    const currentOrderCount = currentPeriodOrders.length;
-    const currentAOV = currentOrderCount > 0 ? currentTotalSales / currentOrderCount : 0;
-    
-    const previousTotalSales = previousPeriodOrders.reduce((sum, order) => sum + order.total, 0);
-    const previousOrderCount = previousPeriodOrders.length;
-    const previousAOV = previousOrderCount > 0 ? previousTotalSales / previousOrderCount : 0;
-    
-    // Product summary
-    const lowStockThreshold = 5;
-    const lowStockProducts = allProducts.filter(product => product.stock > 0 && product.stock <= lowStockThreshold).length;
-    const outOfStockProducts = allProducts.filter(product => product.stock === 0).length;
-    
-    // Top selling products
-    const productSales = new Map<string, { id: string; name: string; sales: number; quantity: number }>();
-    
-    currentPeriodOrders.forEach(order => {
-      order.items.forEach(item => {
-        const existing = productSales.get(item.productId) || { 
-          id: item.productId, 
-          name: item.name, 
-          sales: 0, 
-          quantity: 0 
-        };
-        
-        productSales.set(item.productId, {
-          ...existing,
-          sales: existing.sales + (item.price * item.quantity),
-          quantity: existing.quantity + item.quantity
-        });
-      });
-    });
-    
-    const topSellingProducts = Array.from(productSales.values())
-      .sort((a, b) => b.sales - a.sales)
-      .slice(0, 5);
-    
-    // Customer summary
-    const currentCustomers = getUniqueCustomers(currentPeriodOrders);
-    const previousCustomers = getUniqueCustomers(previousPeriodOrders);
-    const totalCustomers = getUniqueCustomers(allOrders);
-    
-    // Get new customers (in current period but not in previous)
-    const newCustomers = currentCustomers.filter(id => !previousCustomers.includes(id)).length;
-    
-    // Order status summary
-    const orderStatusSummary = currentPeriodOrders.reduce((summary, order) => {
-      summary[order.status]++;
-      return summary;
-    }, {
-      pending: 0,
-      processing: 0,
-      shipped: 0,
-      delivered: 0,
-      cancelled: 0,
-      returned: 0,
-      refunded: 0
-    } as OrderStatusSummary);
-    
-    // Sales by category
-    const categorySales = new Map<string, number>();
-    
-    currentPeriodOrders.forEach(order => {
-      order.items.forEach(item => {
-        const product = allProducts.find(p => p.id === item.productId);
-        if (product) {
-          const category = product.category;
-          const existingSales = categorySales.get(category) || 0;
-          categorySales.set(category, existingSales + (item.price * item.quantity));
-        }
-      });
-    });
-    
-    const salesByCategory = Array.from(categorySales.entries()).map(([category, sales]) => ({
-      category,
-      sales,
-      percentage: (sales / currentTotalSales) * 100
-    })).sort((a, b) => b.sales - a.sales);
-    
-    // Sales by payment method
-    const paymentMethodSales = new Map<string, number>();
-    
-    currentPeriodOrders.forEach(order => {
-      const method = order.paymentMethod === 'credit_card' ? 'Credit Card' : 'UPI';
-      const existingSales = paymentMethodSales.get(method) || 0;
-      paymentMethodSales.set(method, existingSales + order.total);
-    });
-    
-    const salesByPaymentMethod = Array.from(paymentMethodSales.entries()).map(([method, sales]) => ({
-      method,
-      sales,
-      percentage: (sales / currentTotalSales) * 100
-    })).sort((a, b) => b.sales - a.sales);
-    
-    // Sales over time (daily data points)
-    const salesOverTime = getDailyDataPoints(currentPeriodOrders, dateRange);
-    
-    // Recent orders
-    const recentOrders = [...currentPeriodOrders]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 5);
+    const clientRecentOrders = beData.recentOrders.map((order: any) => ({
+        ...order,
+        createdAt: order.createdAt && order.createdAt._seconds ? ClientTimestamp.fromDate(new Date(order.createdAt._seconds * 1000 + (order.createdAt._nanoseconds || 0) / 1000000)) : ClientTimestamp.now(),
+        updatedAt: order.updatedAt && order.updatedAt._seconds ? ClientTimestamp.fromDate(new Date(order.updatedAt._seconds * 1000 + (order.updatedAt._nanoseconds || 0) / 1000000)) : ClientTimestamp.now(),
+        // Ensure other nested timestamps (if any in Order type) are also converted.
+    })) as Order[];
     
     return {
-      salesSummary: {
-        totalSales: currentTotalSales,
-        totalOrders: currentOrderCount,
-        averageOrderValue: currentAOV,
-        comparisonPeriod: {
-          totalSales: previousTotalSales,
-          totalOrders: previousOrderCount,
-          averageOrderValue: previousAOV,
-        },
-        salesGrowth: calculateGrowth(currentTotalSales, previousTotalSales),
-        ordersGrowth: calculateGrowth(currentOrderCount, previousOrderCount),
-        aovGrowth: calculateGrowth(currentAOV, previousAOV)
-      },
-      productSummary: {
-        totalProducts: allProducts.length,
-        lowStockProducts,
-        outOfStockProducts,
-        topSellingProducts
-      },
-      customerSummary: {
-        totalCustomers: totalCustomers.length,
-        newCustomers,
-        returningCustomers: currentCustomers.length - newCustomers,
-        customerGrowth: calculateGrowth(currentCustomers.length, previousCustomers.length)
-      },
-      orderStatusSummary,
-      salesByCategory,
-      salesByPaymentMethod,
-      salesOverTime,
-      recentOrders
-    };
+        salesSummary: beData.salesSummary,
+        productSummary: beData.productSummary,
+        customerSummary: beData.customerSummary,
+        orderStatusSummary: beData.orderStatusSummary,
+        salesByCategory: beData.salesByCategory,
+        salesByPaymentMethod: beData.salesByPaymentMethod,
+        salesOverTime: beData.salesOverTime,
+        recentOrders: clientRecentOrders,
+    } as DashboardDataClient;
+
   } catch (error) {
-    console.error('Failed to get dashboard data:', error);
-    throw new Error('Failed to get dashboard data');
+    console.error("Error calling getDashboardDataCallable:", error);
+    if (error instanceof Error && error.message.includes('functions/analytics-getDashboardDataCF is not a valid function name')) {
+        throw new Error('Analytics function not deployed or misconfigured. Check Firebase console.');
+    }
+    throw error; // Re-throw original or a more specific error
   }
 };
+
+// Remove all old client-side aggregation logic, helpers like getDateRangeForPeriod, filterOrdersByDateRange, etc.
+// Only keep the types needed by the client (DashboardDataClient and its sub-types) and the getDashboardData CF caller.
 
 // Mock data for analytics
 const generateDailyData = (days: number): AnalyticsData[] => {

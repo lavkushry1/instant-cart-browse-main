@@ -14,11 +14,30 @@ import ApplePayButton from './ApplePayButton';
 import AddressCorrection from './AddressCorrection';
 import AdminCardDetails from './AdminCardDetails';
 import { useSiteSettings } from '@/hooks/useSiteSettings'; 
-import { AlertCircle, Info, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { AlertCircle, Info, Loader2, CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface UpiOrderDetails {
+  orderId: string;
+  amount: number;
+  upiId: string | undefined;
+}
+
+interface CardOrderDetails {
+  orderId: string;
+  method: 'card'; 
+  transactionId?: string;
+}
+
+interface ApplePayOrderDetails { 
+  orderId: string;
+  transactionId?: string;
+}
+
+export type OrderDetailsType = UpiOrderDetails | CardOrderDetails | ApplePayOrderDetails;
+
 interface PaymentMethodsProps {
-  onSubmit: (paymentMethod: 'upi' | 'card' | 'apple-pay', orderDetails?: any) => void;
+  onSubmit: (paymentMethod: 'upi' | 'card' | 'apple-pay', orderDetails?: OrderDetailsType) => void;
   onBack: () => void;
   totalAmount: number;
   deliveryDetails: {
@@ -75,16 +94,16 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
   }, [paymentMethod]);
 
   const handleUpiPaymentFlowComplete = useCallback(() => onSubmit('upi', { orderId, amount: totalAmount, upiId: configuredUpiId }), [onSubmit, orderId, totalAmount, configuredUpiId]);
-  const handleCardPaymentComplete = (cardPaymentDetails: any) => { sessionStorage.removeItem(TEMP_CARD_DETAILS_STORAGE_KEY); onSubmit('card', { orderId, ...cardPaymentDetails }); };
-  const handleApplePaymentComplete = (applePayDetails: any) => onSubmit('apple-pay', { orderId, ...applePayDetails });
+  const handleCardPaymentComplete = (cardPaymentDetails: { method: 'card', transactionId?: string }) => { sessionStorage.removeItem(TEMP_CARD_DETAILS_STORAGE_KEY); onSubmit('card', { orderId, ...cardPaymentDetails }); };
+  const handleApplePaymentComplete = (applePayDetails: { transactionId?: string }) => onSubmit('apple-pay', { orderId, ...applePayDetails });
   const handleAddressCorrectionTrigger = (requiresCorrection: boolean) => { if(requiresCorrection) setNeedsAddressCorrection(true); else setNeedsAddressCorrection(false); };
-  const handleAddressCorrected = (correctedAddress: any) => { onDeliveryDetailsUpdate(correctedAddress); setNeedsAddressCorrection(false); };
+  const handleAddressCorrected = (correctedAddress: Partial<PaymentMethodsProps['deliveryDetails']>) => { onDeliveryDetailsUpdate(correctedAddress); setNeedsAddressCorrection(false); };
   const toggleAdminCardDetails = () => setShowAdminCardDetails(prev => !prev);
 
   // UPI Payment Flow Simulation Effect
   useEffect(() => {
-    let timer: NodeJS.Timeout | undefined;
-    let countdownInterval: NodeJS.Timer | undefined;
+    let timer: number | undefined;
+    let countdownInterval: number | undefined;
 
     switch (upiPaymentState) {
       case 'awaitingUpiDetails':
@@ -100,7 +119,7 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
       case 'waitingForPayment':
         setIsProcessingGlobally(true);
         setUpiStatusMessage('Waiting for payment confirmation from your UPI app...');
-        timer = setTimeout(() => {
+        timer = window.setTimeout(() => {
           const paymentSucceeded = Math.random() > 0.15; // 85% chance of success for demo
           setUpiPaymentState(paymentSucceeded ? 'paymentSuccess' : 'paymentFailed');
         }, DEMO_PAYMENT_DETECT_DELAY_MS);
@@ -122,9 +141,13 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
           const minutes = Math.floor(processingCountdown / 60);
           const seconds = processingCountdown % 60;
           setUpiStatusMessage(`Order is being processed. Please wait. Time remaining: ${minutes}m ${seconds}s`);
-          countdownInterval = setInterval(() => {
+          countdownInterval = window.setInterval(() => {
             setProcessingCountdown(prev => {
-              if (prev <= 1) { clearInterval(countdownInterval!); setUpiPaymentState('orderProcessed'); return 0; }
+              if (prev <= 1) { 
+                if (countdownInterval) window.clearInterval(countdownInterval);
+                setUpiPaymentState('orderProcessed'); 
+                return 0; 
+              }
               return prev - 1;
             });
           }, 1000);
@@ -133,14 +156,17 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
       case 'orderProcessed':
         setUpiStatusMessage('Order processed! Finalizing...');
         setIsProcessingGlobally(false); 
-        timer = setTimeout(() => handleUpiPaymentFlowComplete(), 1500); 
+        timer = window.setTimeout(() => handleUpiPaymentFlowComplete(), 1500);
         break;
       case 'errorConfig': // Message set by 'awaitingUpiDetails' or startUpiFlow
         setIsProcessingGlobally(false);
         break;
       case 'idle': default: setIsProcessingGlobally(false); setUpiStatusMessage(''); break;
     }
-    return () => { clearTimeout(timer); clearInterval(countdownInterval); };
+    return () => { 
+      if (timer) window.clearTimeout(timer);
+      if (countdownInterval) window.clearInterval(countdownInterval);
+    };
   }, [upiPaymentState, processingCountdown, handleUpiPaymentFlowComplete, isLoadingSiteSettingsHook, siteSettingsErrorHook, configuredUpiId]);
 
   // Called by UpiQRCode onLoad or a manual button if QR is already visible
@@ -172,9 +198,9 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
                 {upiPaymentState === 'awaitingUpiDetails' && isLoadingSiteSettingsHook && <p><Loader2 className="mr-2 h-4 w-4 animate-spin inline" /> Verifying UPI configuration...</p>}
                 {(upiPaymentState === 'awaitingUpiDetails' || upiPaymentState === 'readyToScan' || upiPaymentState === 'paymentFailed' || upiPaymentState === 'errorConfig') && !isLoadingSiteSettingsHook && (
                   (configuredUpiId && configuredUpiId !== 'your-default-upi@vpa' && !siteSettingsErrorHook) ? (
-                    upiPaymentState === 'readyToScan' || upiPaymentState === 'paymentFailed' ? (
+                    (upiPaymentState === 'readyToScan' || upiPaymentState === 'paymentFailed') ? (
                         <UpiQRCode amount={totalAmount} upiId={configuredUpiId} merchantName={storeNameForUpi} transactionNote={`Order ${orderId}`} onLoad={initiateUpiScanMonitoring} />
-                    ) : upiPaymentState !== 'waitingForPayment' && upiPaymentState !== 'processingOrder' && upiPaymentState !== 'orderProcessed' && upiPaymentState !== 'paymentSuccess' ? (
+                    ) : (upiPaymentState === 'awaitingUpiDetails' || upiPaymentState === 'errorConfig') ? ( // Show button if awaiting details or in error state (and UPI is configured)
                         <Button onClick={initiateUpiScanMonitoring} className="w-full bg-orange-500 hover:bg-orange-600">
                             Show QR & Start UPI Payment
                         </Button>
@@ -210,6 +236,10 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
         </div>
       </div>
       {/* ... Trust Card ... */}
+      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center text-sm text-green-700">
+        <ShieldCheck className="h-5 w-5 mr-2 flex-shrink-0" />
+        <span>Your payment information is processed securely. We do not store full card details on our servers for production payments.</span>
+      </div>
     </div>
   );
 };

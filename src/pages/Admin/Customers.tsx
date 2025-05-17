@@ -14,8 +14,12 @@ import { UserProfile, UserRole, GetAllUserProfilesOptionsBE } from '@/services/u
 import { functionsClient } from '@/lib/firebaseClient';
 import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions';
 
-let getAllUserProfilesAdminCF: HttpsCallable<GetAllUserProfilesOptionsBE | undefined, HttpsCallableResult<{ success: boolean; profiles?: UserProfile[]; totalCount?: number; error?: string }>> | undefined;
-let updateUserRolesAdminCF: HttpsCallable<{ targetUserId: string; roles: UserRole[] }, HttpsCallableResult<{ success: boolean; message?: string; error?: string }>> | undefined;
+// Define direct response types for Cloud Functions
+interface GetAllUserProfilesAdminResponse { success: boolean; profiles?: UserProfile[]; totalCount?: number; error?: string; }
+interface UpdateUserRolesAdminResponse { success: boolean; message?: string; error?: string; }
+
+let getAllUserProfilesAdminCF: HttpsCallable<GetAllUserProfilesOptionsBE | undefined, GetAllUserProfilesAdminResponse> | undefined;
+let updateUserRolesAdminCF: HttpsCallable<{ targetUserId: string; roles: UserRole[] }, UpdateUserRolesAdminResponse> | undefined;
 
 if (functionsClient && Object.keys(functionsClient).length > 0) {
   try {
@@ -30,6 +34,7 @@ if (functionsClient && Object.keys(functionsClient).length > 0) {
     console.warn("AdminCustomers: Firebase functions client not available. Operations will use mocks or fail.");
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fallbackUserCall = async (name: string, payload?: any): Promise<any> => {
     console.warn(`MOCKING User CF call: ${name}`, payload);
     await new Promise(r => setTimeout(r, 300));
@@ -43,6 +48,7 @@ const fallbackUserCall = async (name: string, payload?: any): Promise<any> => {
     return { data: { success: false, error: 'Unknown mock user function' } };
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const formatDate = (dateInput: any): string => new Date(dateInput?.toDate ? dateInput.toDate() : dateInput).toLocaleDateString();
 const ALL_ROLES: UserRole[] = ['customer', 'editor', 'admin']; // Define available roles
 
@@ -58,9 +64,13 @@ const AdminCustomers = () => {
     setIsLoading(true);
     try {
       const fn = getAllUserProfilesAdminCF || ((opts?: GetAllUserProfilesOptionsBE) => fallbackUserCall('users-getAllUserProfilesCF', opts));
-      const result = await fn(options);
-      if (result.data.success && result.data.profiles) setUsers(result.data.profiles);
-      else { toast.error(result.data.error || 'Failed to load users'); setUsers([]); }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: HttpsCallableResult<any> = await fn(options);
+      const responseData = result.data as GetAllUserProfilesAdminResponse;
+
+      if (responseData.success && responseData.profiles) setUsers(responseData.profiles);
+      else { toast.error(responseData.error || 'Failed to load users'); setUsers([]); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e:any) { toast.error('Failed to load users: ' + e.message); setUsers([]); }
     setIsLoading(false);
   }, []);
@@ -82,12 +92,16 @@ const AdminCustomers = () => {
     const fn = updateUserRolesAdminCF || (() => fallbackUserCall('users-updateUserRolesCF', { targetUserId: editingUser.id, roles: newRoles }));
     setIsSavingRoles(true);
     try {
-      const result = await fn({ targetUserId: editingUser.id, roles: newRoles });
-      if (result.data.success) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: HttpsCallableResult<any> = await fn({ targetUserId: editingUser.id, roles: newRoles });
+      const responseData = result.data as UpdateUserRolesAdminResponse;
+
+      if (responseData.success) {
         toast.success("User roles updated!");
         fetchUsers(); 
         setIsRolesDialogOpen(false);
-      } else { toast.error(result.data.error || "Failed to update roles."); }
+      } else { toast.error(responseData.error || "Failed to update roles."); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e:any) { toast.error('Failed to update roles: ' + e.message); }
     setIsSavingRoles(false);
   };

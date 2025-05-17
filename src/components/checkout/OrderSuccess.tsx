@@ -14,9 +14,10 @@ interface OrderSuccessProps {
 }
 
 // Helper to format date from various possible Timestamp/string formats
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const formatDateForDisplay = (dateInput: any) => {
   if (!dateInput) return 'N/A';
-  const date = typeof dateInput === 'string' ? new Date(dateInput) : 
+  const date = typeof dateInput === 'string' ? new Date(dateInput) :
                dateInput.toDate ? dateInput.toDate() : 
                dateInput instanceof Date ? dateInput : new Date(dateInput);
   return date.toLocaleDateString('en-IN', { 

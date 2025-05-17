@@ -7,7 +7,15 @@ import { functionsClient } from '@/lib/firebaseClient';
 import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions'; 
 import { SiteSettings } from '@/services/adminService'; // Shared type from backend service
 
-let getSiteSettingsFunction: HttpsCallable<void, HttpsCallableResult<{ success: boolean; settings?: SiteSettings; error?: string }>> | undefined;
+// Define the expected direct JSON response from the Cloud Function
+interface GetSiteSettingsResponse {
+  success: boolean;
+  settings?: SiteSettings;
+  error?: string;
+  message?: string; // Optional, from fallback
+}
+
+let getSiteSettingsFunction: HttpsCallable<void, GetSiteSettingsResponse> | undefined;
 
 if (functionsClient && Object.keys(functionsClient).length > 0) {
   try {
@@ -23,12 +31,12 @@ if (functionsClient && Object.keys(functionsClient).length > 0) {
 }
 
 // Fallback mock if httpsCallable setup failed or not ready
-const callGetSiteSettingsFallbackMock = async (): Promise<HttpsCallableResult<{ success: boolean; settings?: SiteSettings; error?: string; message?: string}>> => {
+const callGetSiteSettingsFallbackMock = async (): Promise<GetSiteSettingsResponse> => {
     console.warn(`Using MOCK for getSiteSettings in useSiteSettings`);
     await new Promise(resolve => setTimeout(resolve, 400)); 
     const storedSettings = localStorage.getItem('adminSiteSettingsMock'); 
-    if (storedSettings) return { data: { success: true, settings: JSON.parse(storedSettings) } };
-    return { data: { success: true, settings: { storeName: "Default Mock Store from Hook", paymentGatewayKeys: { upiVpa: 'hook-default@upi_mock' } } } };
+    if (storedSettings) return { success: true, settings: JSON.parse(storedSettings) };
+    return { success: true, settings: { storeName: "Default Mock Store from Hook", paymentGatewayKeys: { upiVpa: 'hook-default@upi_mock' } } };
 };
 
 interface UseSiteSettingsReturn {
@@ -40,29 +48,36 @@ interface UseSiteSettingsReturn {
 
 export const useSiteSettings = (): UseSiteSettingsReturn => {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const [error, setError] = useState<string | null>(null); // Reverted from any
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
 
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = getSiteSettingsFunction 
-        ? await getSiteSettingsFunction() 
-        : await callGetSiteSettingsFallbackMock();
+      let responseData: GetSiteSettingsResponse;
+      if (getSiteSettingsFunction) {
+        const result: HttpsCallableResult<GetSiteSettingsResponse> = await getSiteSettingsFunction();
+        responseData = result.data;
+      } else {
+        responseData = await callGetSiteSettingsFallbackMock();
+      }
 
-      if (result.data.success && result.data.settings) {
-        setSettings(result.data.settings as SiteSettings);
+      if (responseData.success && responseData.settings) {
+        setSettings(responseData.settings as SiteSettings);
         // Persist to localStorage for PaymentMethods.tsx to pick up if needed immediately or as fallback
-        if(result.data.settings.paymentGatewayKeys?.upiVpa) {
-            localStorage.setItem('storeUpiId', result.data.settings.paymentGatewayKeys.upiVpa);
+        if(responseData.settings.paymentGatewayKeys?.upiVpa) {
+            localStorage.setItem('storeUpiId', responseData.settings.paymentGatewayKeys.upiVpa);
         }
       } else {
-        setError(result.data.error || "Failed to load site settings via hook.");
-        toast.error(result.data.error || "Failed to load site settings via hook.");
+        setError(responseData.error || responseData.message || "Failed to load site settings via hook.");
+        toast.error(responseData.error || responseData.message || "Failed to load site settings via hook.");
       }
-    } catch (err: any) {
-      const errorMessage = err.message || 'An unknown error occurred while fetching site settings.';
+    } catch (err: unknown) {
+      let errorMessage = 'An unknown error occurred while fetching site settings.';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
       setError(errorMessage);
       toast.error(errorMessage);
       console.error("Error in useSiteSettings fetchSettings:", err);

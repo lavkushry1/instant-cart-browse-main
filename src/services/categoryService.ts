@@ -1,10 +1,11 @@
 // src/services/categoryService.ts
 
+import * as admin from 'firebase-admin'; // Import for Timestamp type
 // Import Firebase Admin resources
 import {
   db, // Firestore instance from firebaseAdmin.ts
   adminInstance // For FieldValue, Timestamp etc. from firebaseAdmin.ts
-} from '../../lib/firebaseAdmin'; // Adjust path as necessary
+} from '../lib/firebaseAdmin'; // Corrected path
 const CATEGORIES_COLLECTION = 'categories';
 const PRODUCTS_COLLECTION = 'products'; // For checking product associations
 
@@ -17,12 +18,21 @@ export interface Category {
   parentId?: string | null; 
   productCount?: number; 
   isEnabled: boolean;
-  createdAt: any; // admin.firestore.Timestamp
-  updatedAt: any; // admin.firestore.Timestamp
+  createdAt: admin.firestore.Timestamp | admin.firestore.FieldValue; // Corrected type
+  updatedAt: admin.firestore.Timestamp | admin.firestore.FieldValue; // Corrected type
 }
 
-export type CategoryCreationData = Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'productCount'>;
+export type CategoryCreationData = Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'productCount' | 'slug'>;
 export type CategoryUpdateData = Partial<Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'productCount'>>;
+
+// Interface for the data structure being saved to Firestore for creation
+interface CategoryWriteData extends CategoryCreationData {
+  slug: string;
+  productCount: number;
+  isEnabled: boolean; // isEnabled is part of CategoryCreationData but explicitly ensuring it here
+  createdAt: admin.firestore.FieldValue;
+  updatedAt: admin.firestore.FieldValue;
+}
 
 console.log(`(Service-Backend) Category Service: Using Firestore collection: ${CATEGORIES_COLLECTION}`);
 
@@ -35,15 +45,15 @@ export const createCategoryBE = async (categoryData: CategoryCreationData): Prom
       throw new Error(`Category slug "${slug}" already exists.`);
     }
 
-    const dataToSave: any = {
+    const dataToSave: CategoryWriteData = {
       ...categoryData,
       slug,
-      productCount: 0,
+      productCount: 0, // Default value
       isEnabled: categoryData.isEnabled === undefined ? true : categoryData.isEnabled,
       createdAt: adminInstance.firestore.FieldValue.serverTimestamp(),
       updatedAt: adminInstance.firestore.FieldValue.serverTimestamp(),
     };
-    Object.keys(dataToSave).forEach(key => dataToSave[key] === undefined && delete dataToSave[key]);
+    // Object.keys(dataToSave).forEach(key => dataToSave[key] === undefined && delete dataToSave[key]); // Not strictly needed with strong types
 
     const docRef = await db.collection(CATEGORIES_COLLECTION).add(dataToSave);
     const newDoc = await docRef.get();
@@ -108,17 +118,14 @@ export const updateCategoryBE = async (categoryId: string, categoryData: Categor
   const newSlug = categoryData.name ? categoryData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '') : undefined;
   try {
     const docRef = db.collection(CATEGORIES_COLLECTION).doc(categoryId);
-    const dataToUpdate: any = { ...categoryData, updatedAt: adminInstance.firestore.FieldValue.serverTimestamp() };
+    const dataToUpdate: Partial<Omit<Category, 'id' | 'createdAt' | 'productCount'> & {updatedAt: admin.firestore.FieldValue}> = {
+         ...categoryData,
+         updatedAt: adminInstance.firestore.FieldValue.serverTimestamp() 
+    };
     if (newSlug) {
-        // Optional: Check for new slug uniqueness before updating, excluding the current document
-        // const slugCheck = await db.collection(CATEGORIES_COLLECTION).where('slug', '==', newSlug).limit(1).get();
-        // if (!slugCheck.empty && slugCheck.docs[0].id !== categoryId) {
-        //   throw new Error(`Category slug "${newSlug}" already exists for another category.`);
-        // }
         dataToUpdate.slug = newSlug;
     }
 
-    Object.keys(dataToUpdate).forEach(key => dataToUpdate[key] === undefined && delete dataToUpdate[key]);
     await docRef.update(dataToUpdate);
     const updatedDoc = await docRef.get();
     if (!updatedDoc.exists) {
@@ -134,15 +141,21 @@ export const updateCategoryBE = async (categoryId: string, categoryData: Categor
 export const deleteCategoryBE = async (categoryId: string): Promise<void> => {
   console.log(`(Service-Backend) deleteCategoryBE for ID: ${categoryId}`);
   try {
+    // Check 1: Products associated with this category
     const productsInCategory = await db.collection(PRODUCTS_COLLECTION)
                                        .where('categoryId', '==', categoryId)
                                        .limit(1).get();
     if (!productsInCategory.empty) {
       throw new Error("Cannot delete category: products are still associated with it. Please reassign products first.");
     }
-    // TODO: Add logic to handle subcategories. Either disallow deletion if subcategories exist,
-    // or delete them recursively (which can be complex and resource-intensive).
-    // For now, assumes no subcategories or they are handled manually.
+
+    // Check 2: Subcategories associated with this category
+    const subcategories = await db.collection(CATEGORIES_COLLECTION)
+                                  .where('parentId', '==', categoryId)
+                                  .limit(1).get();
+    if (!subcategories.empty) {
+      throw new Error("Cannot delete category: subcategories exist. Please delete or reassign subcategories first.");
+    }
 
     await db.collection(CATEGORIES_COLLECTION).doc(categoryId).delete();
   } catch (error) {

@@ -6,7 +6,7 @@ import {
   Users, 
   ShoppingBag, 
   Package,
-  TrendingUp,
+  TrendingUp, 
   TrendingDown, 
   AlertCircle,
   Clock,
@@ -38,8 +38,8 @@ import AdminLayout from '@/components/layout/AdminLayout';
 import { 
   getDashboardData, 
   TimePeriod, 
-  DashboardData,
-  OrderStatusSummary 
+  DashboardDataClient,
+  OrderStatusSummaryClient
 } from '@/services/analyticsService';
 import { formatDate } from '@/lib/utils';
 
@@ -153,7 +153,7 @@ const AdminDashboard = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardDataClient | null>(null);
 
   // Fetch dashboard data based on selected time period
   useEffect(() => {
@@ -286,11 +286,11 @@ const AdminDashboard = () => {
       },
       tooltip: {
         callbacks: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           label: (context: any) => {
             const label = context.label || '';
             const value = context.raw || 0;
-            const percentage = dashboardData?.salesByCategory[context.dataIndex]?.percentage.toFixed(1) || 0;
-            return `${label}: ${formatCurrency(value)} (${percentage}%)`;
+            return `${label}: ${formatCurrency(value)}`;
           },
         },
       },
@@ -349,33 +349,33 @@ const AdminDashboard = () => {
             <StatsCard
               title="Total Sales"
               value={formatCurrency(dashboardData?.salesSummary.totalSales || 0)}
-              description="vs. previous period"
+              description="Total sales in period"
               icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-              trend={dashboardData?.salesSummary.salesGrowth || 0}
+              trend={0}
               loading={isLoading}
             />
             <StatsCard
               title="Total Orders"
               value={dashboardData?.salesSummary.totalOrders.toString() || '0'}
-              description="vs. previous period"
+              description="Total orders in period"
               icon={<ShoppingBag className="h-4 w-4 text-muted-foreground" />}
-              trend={dashboardData?.salesSummary.ordersGrowth || 0}
+              trend={0}
               loading={isLoading}
             />
             <StatsCard
               title="Average Order Value"
               value={formatCurrency(dashboardData?.salesSummary.averageOrderValue || 0)}
-              description="vs. previous period"
+              description="Average value per order"
               icon={<Activity className="h-4 w-4 text-muted-foreground" />}
-              trend={dashboardData?.salesSummary.aovGrowth || 0}
+              trend={0}
               loading={isLoading}
             />
             <StatsCard
               title="Total Customers"
               value={dashboardData?.customerSummary.totalCustomers.toString() || '0'}
-              description={`(${dashboardData?.customerSummary.newCustomers || 0} new)`}
+              description={`(${dashboardData?.customerSummary.newCustomers || 0} new in period)`}
               icon={<Users className="h-4 w-4 text-muted-foreground" />}
-              trend={dashboardData?.customerSummary.customerGrowth || 0}
+              trend={0}
               loading={isLoading}
             />
           </div>

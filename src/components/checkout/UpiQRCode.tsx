@@ -1,5 +1,6 @@
 // src/components/checkout/UpiQRCode.tsx
 import React, { useEffect, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react'; // Using qrcode.react
 
 // Placeholder for a QR code generation library. 
 // In a real app, you might use a library like 'qrcode.react' or 'react-qr-code'.
@@ -24,12 +25,16 @@ const UpiQRCode: React.FC<UpiQRCodeProps> = ({
 }) => {
   const [qrData, setQrData] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorGenerating, setErrorGenerating] = useState<string | null>(null);
 
   useEffect(() => {
+    setIsLoading(true);
+    setErrorGenerating(null);
     if (!upiId || amount <= 0) {
       const errorMsg = 'Invalid UPI ID or amount for QR code generation.';
       console.error(errorMsg);
       if (onError) onError(new Error(errorMsg));
+      setErrorGenerating(errorMsg);
       setIsLoading(false);
       setQrData(null);
       return;
@@ -56,27 +61,30 @@ const UpiQRCode: React.FC<UpiQRCodeProps> = ({
   }, [amount, upiId, merchantName, transactionNote, onLoad, onError]);
 
   if (isLoading) {
-    return <div className="text-center p-4">Generating UPI QR Code...</div>;
+    return <div className="text-center p-4 animate-pulse">Generating UPI QR Code...</div>;
   }
 
-  if (!qrData) {
-    return <div className="text-center p-4 text-red-500">Could not generate UPI QR Code. Please check UPI ID and amount.</div>;
+  if (errorGenerating || !qrData) {
+    return <div className="text-center p-4 text-red-500">Error: {errorGenerating || "Could not generate UPI QR Code."}</div>;
   }
 
   return (
     <div className="flex flex-col items-center p-4 bg-white rounded-lg shadow-md">
       <h3 className="text-lg font-semibold mb-3">Scan to Pay with UPI</h3>
       <div className="p-2 bg-gray-100 rounded-md mb-3">
-        {/* Placeholder for actual QR Code Component */}
-        {/* Replace this div with <QRCode value={qrData} size={200} level="H" /> or similar */}
-        <div 
-            className="w-48 h-48 md:w-56 md:h-56 bg-gray-300 flex items-center justify-center text-sm text-gray-500 rounded-md"
-            title={`UPI QR Data: ${qrData}`}
-        >
-            [QR Code Placeholder]
-            <br/>
-            Data: {qrData.substring(0,30)}...
-        </div>
+        <QRCodeSVG 
+            value={qrData} 
+            size={200} // Adjust size as needed, e.g., 192 for w-48, 224 for w-56
+            bgColor="#ffffff"
+            fgColor="#000000"
+            level="H" // Error correction level: L, M, Q, H
+            imageSettings={{
+                // src: "/path/to/logo.png", // Optional: embed a logo in the QR code
+                // height: 30,
+                // width: 30,
+                // excavate: true,
+            }}
+        />
       </div>
       <p className="text-sm text-gray-700 mb-1">
         <strong>Amount:</strong> ₹{amount.toFixed(2)}
