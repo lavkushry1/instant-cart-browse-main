@@ -1,7 +1,7 @@
 // functions/src/services/analyticsServiceBE.ts
 
 import * as admin from 'firebase-admin';
-import { db, adminInstance } from '../../../src/lib/firebaseAdmin'; // For Timestamps
+import { firestoreDB as db, adminInstance } from '../lib/firebaseAdmin'; // Corrected relative path
 
 // Import BE service functions
 import { getOrdersBE, Order as OrderBE, OrderStatus as OrderStatusBE, GetOrdersOptionsBE } from './orderServiceBE';
@@ -168,7 +168,7 @@ export const getDashboardDataBE = async (
   let lastVisibleOrder: admin.firestore.DocumentSnapshot | undefined = undefined;
   const orderFetchLimit = 200; // Fetch orders in batches
 
-  // eslint-disable-next-line no-constant-condition
+   
   while (true) {
     const orderOptions: GetOrdersOptionsBE = {
       startDate: dateRange.startDate,
@@ -197,7 +197,7 @@ export const getDashboardDataBE = async (
   let lastVisibleProduct: admin.firestore.DocumentSnapshot | undefined = undefined;
   const productFetchLimit = 200;
   
-  // eslint-disable-next-line no-constant-condition
+   
   while(true) {
       const productOptions: GetAllProductsOptionsBE = {
           fetchAll: true, // Fetch all regardless of isEnabled for admin analytics
@@ -215,7 +215,7 @@ export const getDashboardDataBE = async (
 
   // 3. Calculate Sales Summary
   let totalSales = 0;
-  let totalOrders = allOrders.length;
+  const totalOrders = allOrders.length;
   allOrders.forEach(order => {
     totalSales += order.grandTotal;
   });
@@ -298,7 +298,7 @@ export const getDashboardDataBE = async (
   };
   allOrders.forEach(order => {
     const statusKey = order.orderStatus.toLowerCase() as keyof OrderStatusSummaryBE;
-    if (orderStatusSummary.hasOwnProperty(statusKey)) {
+    if (Object.prototype.hasOwnProperty.call(orderStatusSummary, statusKey)) {
         orderStatusSummary[statusKey]++;
     } else {
         // Fallback for statuses not directly matching keys, e.g. 'PaymentFailed' from OrderStatusBE
@@ -345,7 +345,7 @@ export const getDashboardDataBE = async (
 
   // 9. Prepare Sales Over Time Data (Daily aggregation)
   const salesOverTimeMap = new Map<string, { sales: number; orders: number }>();
-  let currentDate = dateRange.startDate.toDate();
+  const currentDate = dateRange.startDate.toDate();
   const anEndDate = dateRange.endDate.toDate(); // Renamed to avoid conflict with global endDate if any
   while(currentDate <= anEndDate) {
       salesOverTimeMap.set(formatChartDateBE(admin.firestore.Timestamp.fromDate(currentDate)), {sales: 0, orders: 0});

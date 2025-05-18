@@ -9,7 +9,7 @@ import {
 import { adminInstance } from '../lib/firebaseAdmin'; // Corrected path for adminInstance
 
 // Initialize Firebase Admin SDK (idempotent call via import)
-adminInstance; // Ensures firebaseAdmin.ts runs and initializes SDK
+// adminInstance; // Removed as it's an unused expression and initialization is handled by import
 
 console.log('(Cloud Functions) savedItems.functions.ts: Initializing...');
 

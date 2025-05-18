@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions/v1';
 // Use functions.https.CallableContext for typing context
-import { addToWishlistBE, getWishlistBE, removeFromWishlistBE } from '../../../src/services/wishlistService'; // Corrected path
+import { addToWishlistBE, getWishlistBE, removeFromWishlistBE } from '../services/wishlistServiceBE'; // Corrected path
 
 // Helper to check authentication
 const ensureAuthenticated = (context: functions.https.CallableContext): string => {

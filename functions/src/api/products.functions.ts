@@ -7,8 +7,12 @@ import {
   getAllProductsBE,
   updateProductBE,
   deleteProductBE,
-} from '../../../src/services/productService'; // Adjust path
-import { ProductCreationData, ProductUpdateData, GetAllProductsOptionsBE } from '../../../src/services/productService';
+} from '../services/productServiceBE'; // Corrected path
+import { 
+    ProductCreationDataBE, // Corrected type
+    ProductUpdateDataBE,   // Corrected type
+    GetAllProductsOptionsBE // Corrected type
+} from '../services/productServiceBE'; // Corrected path
 
 // Helper to check for admin role (example)
 const ensureAdmin = (context: functions.https.CallableContext) => {
@@ -19,7 +23,7 @@ const ensureAdmin = (context: functions.https.CallableContext) => {
 
 console.log("(Cloud Functions) products.functions.ts: Initializing with LIVE logic...");
 
-export const createProductCF = functions.https.onCall(async (data: ProductCreationData, context) => {
+export const createProductCF = functions.https.onCall(async (data: ProductCreationDataBE, context) => {
   console.log("(Cloud Function) createProductCF called with data:", data);
   ensureAdmin(context);
   try {
@@ -84,7 +88,7 @@ export const getAllProductsCF = functions.https.onCall(async (data: GetAllProduc
   }
 });
 
-export const updateProductCF = functions.https.onCall(async (data: { productId: string; updateData: ProductUpdateData }, context) => {
+export const updateProductCF = functions.https.onCall(async (data: { productId: string; updateData: ProductUpdateDataBE }, context) => {
   console.log("(Cloud Function) updateProductCF called with data:", data);
   ensureAdmin(context);
   try {

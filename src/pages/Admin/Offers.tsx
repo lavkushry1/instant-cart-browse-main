@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { functionsClient } from '@/lib/firebaseClient';
+import { functionsClient } from '../../lib/firebaseClient';
 import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions';
 import { toast } from 'sonner';
-import { Offer, OfferCreationData, OfferUpdateData, OfferCondition as OfferServiceCondition } from '@/services/offerService'; // Import types from service
+import { Offer, OfferCreationData, OfferUpdateData, OfferCondition as OfferServiceCondition } from '../../services/offerService'; // Corrected path
 
 // Define interfaces for Cloud Function responses
 interface GetAllOffersAdminResponse {
@@ -83,9 +83,10 @@ const AdminOffersPage: React.FC = () => {
         toast.error(result.data.error || "Failed to fetch offers.");
         setOffers([]);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching offers:', error);
-      toast.error(error.message || 'An unexpected error occurred while fetching offers.');
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred while fetching offers.';
+      toast.error(message);
       setOffers([]);
     }
     setIsLoading(false);
@@ -110,9 +111,10 @@ const AdminOffersPage: React.FC = () => {
         } else {
           toast.error(result.data.error || "Failed to delete offer.");
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error deleting offer:', error);
-        toast.error(error.message || 'An unexpected error occurred while deleting the offer.');
+        const message = error instanceof Error ? error.message : 'An unexpected error occurred while deleting the offer.';
+        toast.error(message);
       }
     }
   };
@@ -120,7 +122,7 @@ const AdminOffersPage: React.FC = () => {
   const handleFormSubmit = async (formDataFromForm: OfferFormData) => {
     // formDataFromForm has dates as YYYY-MM-DD strings.
     // Convert them to full ISO strings for backend.
-    const submissionPayload: any = { ...formDataFromForm };
+    const submissionPayload: OfferFormData = { ...formDataFromForm };
 
     if (submissionPayload.validFrom && typeof submissionPayload.validFrom === 'string') {
       // Assuming YYYY-MM-DD, convert to full ISO string with UTC timezone
@@ -190,9 +192,10 @@ const AdminOffersPage: React.FC = () => {
           toast.error(result.data.error || "Failed to create offer.");
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving offer:', error);
-      toast.error(error.message || 'An unexpected error occurred while saving the offer.');
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred while saving the offer.';
+      toast.error(message);
     }
   };
 
@@ -306,8 +309,8 @@ const OfferForm: React.FC<OfferFormProps> = ({ initialData, onSubmit, onCancel }
 
     if (initialData && Object.keys(initialData).length > 0) {
         // Use initialData directly for properties and handle dates separately to avoid 'never' type issues
-        const initialValidFrom = initialData.validFrom as any; 
-        const initialValidTill = initialData.validTill as any;
+        const initialValidFrom = initialData.validFrom as unknown; 
+        const initialValidTill = initialData.validTill as unknown;
         const { validFrom, validTill, createdAt, updatedAt, condition, ...restOfInitial } = initialData;
 
         dataToSet = { 
@@ -319,11 +322,11 @@ const OfferForm: React.FC<OfferFormProps> = ({ initialData, onSubmit, onCancel }
         };
 
         if (initialValidFrom) {
-            if (typeof initialValidFrom.toDate === 'function') { // Check for Firebase Timestamp .toDate() method
-                try { dataToSet.validFrom = initialValidFrom.toDate().toISOString().split('T')[0]; } 
+            if (typeof (initialValidFrom as { toDate?: () => Date }).toDate === 'function') { 
+                try { dataToSet.validFrom = (initialValidFrom as { toDate: () => Date }).toDate().toISOString().split('T')[0]; } 
                 catch (e) { console.warn("Error converting initial validFrom to YYYY-MM-DD string", e); dataToSet.validFrom = undefined; }
-            } else if (typeof initialValidFrom === 'string') { // If it's already a string
-                dataToSet.validFrom = initialValidFrom.split('T')[0]; // Assume it might be ISO, take date part
+            } else if (typeof initialValidFrom === 'string') { 
+                dataToSet.validFrom = initialValidFrom.split('T')[0]; 
             } else {
                 console.warn("initialData.validFrom is of unexpected type:", initialValidFrom);
                 dataToSet.validFrom = undefined;
@@ -331,10 +334,10 @@ const OfferForm: React.FC<OfferFormProps> = ({ initialData, onSubmit, onCancel }
         }
 
         if (initialValidTill) {
-            if (typeof initialValidTill.toDate === 'function') { // Check for Firebase Timestamp .toDate() method
-                try { dataToSet.validTill = initialValidTill.toDate().toISOString().split('T')[0]; } 
+            if (typeof (initialValidTill as { toDate?: () => Date }).toDate === 'function') { 
+                try { dataToSet.validTill = (initialValidTill as { toDate: () => Date }).toDate().toISOString().split('T')[0]; } 
                 catch (e) { console.warn("Error converting initial validTill to YYYY-MM-DD string", e); dataToSet.validTill = undefined; }
-            } else if (typeof initialValidTill === 'string') {
+            } else if (typeof initialValidTill === 'string') { 
                 dataToSet.validTill = initialValidTill.split('T')[0];
             } else {
                 console.warn("initialData.validTill is of unexpected type:", initialValidTill);
@@ -349,7 +352,7 @@ const OfferForm: React.FC<OfferFormProps> = ({ initialData, onSubmit, onCancel }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    let processedValue: any = value;
+    let processedValue: string | number | boolean | string[] | undefined = value;
 
     if (type === 'checkbox') {
       processedValue = (e.target as HTMLInputElement).checked;

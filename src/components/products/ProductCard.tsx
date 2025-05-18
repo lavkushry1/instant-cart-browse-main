@@ -38,7 +38,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     if (!isAuthenticated) {
       setIsInGuestWishlistLocal(isProductInGuestWishlist(id));
     }
-  }, [isAuthenticated, id, isProductInGuestWishlist]); // Added isProductInGuestWishlist to dependencies
+  }, [isAuthenticated, id]); // Removed isProductInGuestWishlist from dependencies
 
   // Get offer details for this product
   // The `product` object passed to `getApplicableOfferForProduct` must match its expected structure
@@ -62,6 +62,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     offerDiscountPercent = Math.round(((price - finalPrice) / price) * 100);
   }
 
+  const isWishlistedCurrent = isAuthenticated ? isProductInWishlist(id) : isInGuestWishlistLocal;
+
   if (isLoadingOffers) {
     // Optional: Render a skeleton or basic price display while offers are loading
     // For simplicity, we'll just show the base price, but you might want a loading indicator.
@@ -74,7 +76,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         onClick={(e) => {
           e.stopPropagation(); // Prevent card click if any
           if (isAuthenticated) {
-            isProductInWishlist(id) ? removeFromWishlist(id) : addToWishlist(id);
+            if (isProductInWishlist(id)) {
+              removeFromWishlist(id);
+            } else {
+              addToWishlist(id);
+            }
           } else {
             // Guest wishlist logic
             if (isInGuestWishlistLocal) {
@@ -87,15 +93,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           }
         }}
         className={`absolute top-2 right-2 z-10 p-1.5 rounded-full transition-colors duration-200 
-                    ${(isAuthenticated ? isProductInWishlist(id) : isInGuestWishlistLocal) 
+                    ${isWishlistedCurrent 
                       ? 'bg-red-100 hover:bg-red-200' 
                       : 'bg-gray-100 hover:bg-gray-200'}`}
-        aria-label={(isAuthenticated ? isProductInWishlist(id) : isInGuestWishlistLocal) 
+        aria-label={isWishlistedCurrent 
                       ? 'Remove from wishlist' 
                       : 'Add to wishlist'}
       >
         <Heart 
-          className={`w-5 h-5 ${(isAuthenticated ? isProductInWishlist(id) : isInGuestWishlistLocal) 
+          className={`w-5 h-5 ${isWishlistedCurrent 
                       ? 'text-red-500 fill-red-500' 
                       : 'text-gray-500'}`} 
         />

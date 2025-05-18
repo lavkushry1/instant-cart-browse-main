@@ -1,9 +1,9 @@
 import * as admin from 'firebase-admin';
 import {
-  db,
+  firestoreDB as db,
   adminInstance,
-  storage
-} from '../../../src/lib/firebaseAdmin'; // Adjusted path
+  storageAdmin as storage
+} from '../lib/firebaseAdmin'; // Corrected path
 
 // Import types that might be shared or defined here if specific to BE
 // Assuming Product, ProductVariation, ProductReview, ProductCreationData, ProductUpdateData might be needed
@@ -91,22 +91,22 @@ interface ProductUpdateWriteDataBE extends ProductUpdateDataBE {
 console.log(`(Service-Backend) Product Service BE: Using Firestore collection: ${PRODUCTS_COLLECTION}`);
 
 const generateBaseSlug = (text: string): string => {
-  if (!text) return 'product'; 
+  if (!text) return 'product';
   return text
     .toString()
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, '-')      
-    .replace(/[^\w\-]+/g, '')   
-    .replace(/\-\-+/g, '-')     
-    .replace(/^-+/, '')         
-    .replace(/-+$/, '');        
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '')
+    .replace(/--+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
 };
 
 const generateUniqueSlugBE = async (baseText: string, currentProductId?: string): Promise<string> => {
   let potentialSlug = generateBaseSlug(baseText);
   let counter = 1;
-  // eslint-disable-next-line no-constant-condition
+   
   while (true) {
     const query = db.collection(PRODUCTS_COLLECTION).where('slug', '==', potentialSlug);
     const snapshot = await query.get();
@@ -327,7 +327,7 @@ export const updateProductBE = async (productId: string, productData: ProductUpd
     }
 
 
-    transaction.update(productRef, dataToUpdate as { [key: string]: any });
+    transaction.update(productRef, dataToUpdate as Partial<ProductBE>);
     return { ...oldProductData, ...dataToUpdate, id: productId } as ProductBE; // Return optimistic update
   }).then(async () => {
       const updatedDoc = await productRef.get();
@@ -419,7 +419,7 @@ export const addProductReviewBE = async (
       rating: reviewData.rating,
       comment: reviewData.comment || '',
       reviewerName: reviewerName || 'Anonymous', // Default if not provided
-      createdAt: adminInstance.firestore.FieldValue.serverTimestamp() as any, // FieldValue is fine
+      createdAt: adminInstance.firestore.FieldValue.serverTimestamp(),
     };
     transaction.set(newReviewRef, dataToSave);
 

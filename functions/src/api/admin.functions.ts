@@ -5,7 +5,7 @@ import {
   getSiteSettingsBE,
   updateSiteSettingsBE,
 } from '../services/adminServiceBE';
-import { SiteSettings } from '../../../src/services/adminService';
+import { SiteSettingsBE as SiteSettings } from '../types/adminSettingsBE';
 
 const ensureAdmin = (context: functions.https.CallableContext): string => {
   if (!context.auth || !context.auth.token.admin) { 

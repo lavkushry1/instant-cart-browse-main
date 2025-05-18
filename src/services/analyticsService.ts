@@ -1,7 +1,7 @@
-import { functionsClient } from '../lib/firebaseClient'; // Corrected path
+import { functionsClient } from './../lib/firebaseClient'; // Corrected path
 import { httpsCallable, HttpsCallableResult, HttpsCallable } from 'firebase/functions';
-import { Timestamp as ClientTimestamp } from 'firebase/firestore';
-import { Order } from '@/types/order'; // Assuming this uses ClientTimestamp
+import { Timestamp as ClientTimestamp, QueryConstraint } from 'firebase/firestore'; // Corrected ClientTimestamp import
+import { Order as ClientOrder } from '../types/order'; // Corrected path and aliased
 import {
   AnalyticsData,
   CustomerInsight,
@@ -19,6 +19,10 @@ import {
   ReportExportOptions
 } from '@/types/analytics';
 
+// Import BE types for stricter mapping
+import { DashboardDataBE, SalesSummaryBE, ProductSummaryBE, CustomerSummaryBE, OrderStatusSummaryBE, SalesByCategoryBE, SalesByPaymentMethodBE, DateRangeBE, TimePeriod as BETimePeriod } from '../../functions/src/services/analyticsServiceBE';
+import { Order as OrderBE, OrderAddress as OrderAddressBE, OrderItem as OrderItemBE, OrderStatus as BEOrderStatus } from '../../functions/src/services/orderServiceBE';
+
 // Re-define types for Client context if they differ from BE, specifically Timestamps.
 // Or, use a generic type that can be <T extends Timestamp> client-side or admin-side.
 
@@ -29,53 +33,12 @@ export interface DateRangeClient {
     endDate: ClientTimestamp | Date | string;
 }
 
-export interface SalesSummaryClient {
-  totalSales: number;
-  totalOrders: number;
-  averageOrderValue: number;
-  // Growth metrics would be calculated client-side if previous period data is also fetched or returned by CF
-}
-
-export interface ProductSummaryClient {
-  totalProducts: number;
-  lowStockProducts: number;
-  outOfStockProducts: number;
-  topSellingProducts: Array<{
-    id: string;
-    name: string;
-    sales: number;
-    quantity: number;
-  }>;
-}
-
-export interface CustomerSummaryClient {
-  totalCustomers: number;
-  newCustomers: number;
-  returningCustomers: number;
-}
-
-export interface OrderStatusSummaryClient {
-  pending: number;
-  processing: number;
-  shipped: number;
-  delivered: number;
-  cancelled: number;
-  returned: number;
-  paymentFailed: number;
-  refunded: number;
-}
-
-export interface SalesByCategoryClient {
-  category: string;
-  sales: number;
-  orderCount: number;
-}
-
-export interface SalesByPaymentMethodClient {
-  method: string;
-  sales: number;
-  orderCount: number;
-}
+export type SalesSummaryClient = SalesSummaryBE;
+export type ProductSummaryClient = ProductSummaryBE;
+export type CustomerSummaryClient = CustomerSummaryBE;
+export type OrderStatusSummaryClient = OrderStatusSummaryBE;
+export type SalesByCategoryClient = SalesByCategoryBE;
+export type SalesByPaymentMethodClient = SalesByPaymentMethodBE;
 
 // This DashboardData type is what the client-side components (AdminDashboard.tsx) will expect.
 // It should mirror DashboardDataBE but use ClientTimestamps where appropriate if dates are passed through.
@@ -93,15 +56,23 @@ export interface DashboardDataClient {
     sales: number;
     orders: number;
   }>;
-  recentOrders: Order[]; // Use the client Order type from @/types/order
+  recentOrders: ClientOrder[]; // Use the client Order type
+}
+
+interface SerializedTimestamp {
+  _seconds: number;
+  _nanoseconds: number;
+}
+
+function isSerializedTimestamp(value: unknown): value is SerializedTimestamp {
+  return value !== null && typeof value === 'object' &&
+         typeof (value as SerializedTimestamp)._seconds === 'number' &&
+         typeof (value as SerializedTimestamp)._nanoseconds === 'number';
 }
 
 // --- Cloud Function Call ---
 
-let getDashboardDataCallable: HttpsCallable<
-  { timePeriod: TimePeriod; customRange?: { startDate: string; endDate: string } }, 
-  { success: boolean; data?: DashboardDataClient; error?: string }
->;
+let getDashboardDataCallable: HttpsCallable<{ timePeriod: BETimePeriod; customRange?: { startDate: string; endDate: string; }; }, { success: boolean; data?: DashboardDataBE; error?: string; }> | undefined;
 
 const initializeCallables = () => {
     if (!functionsClient) {
@@ -122,21 +93,25 @@ export const getDashboardData = async (
   period: TimePeriod = 'month',
   customRange?: DateRangeClient
 ): Promise<DashboardDataClient> => {
-  initializeCallables(); // Initialize on first use
   if (!getDashboardDataCallable) {
-    throw new Error("Analytics function (getDashboardDataCallable) not initialized.");
+    initializeCallables(); // Ensure callable is initialized
+    if (!getDashboardDataCallable) {
+      console.error("getDashboardDataCallable failed to initialize.");
+      throw new Error('Analytics service is not available.');
+    }
   }
+  
+  const toISO = (date: ClientTimestamp | Date | string): string => {
+    if (typeof date === 'string') return date;
+    if (date instanceof ClientTimestamp) return date.toDate().toISOString();
+    return date.toISOString();
+  };
 
-  console.log('(Service-Client) getDashboardData called for period:', period, 'customRange:', customRange);
-
-  let payloadRange;
-  if (customRange && customRange.startDate && customRange.endDate) {
-    // Convert Date/ClientTimestamp to ISO string for CF payload
-    const toISO = (date: ClientTimestamp | Date | string): string => {
-        if (typeof date === 'string') return date;
-        if (date instanceof ClientTimestamp) return date.toDate().toISOString();
-        return date.toISOString();
-    };
+  let payloadRange: { startDate: string; endDate: string; } | undefined = undefined;
+  if (period === 'custom' && customRange) {
+    if (!customRange.startDate || !customRange.endDate) {
+        throw new Error('Custom date range requires both startDate and endDate.');
+    }
     payloadRange = {
         startDate: toISO(customRange.startDate),
         endDate: toISO(customRange.endDate),
@@ -144,35 +119,91 @@ export const getDashboardData = async (
   }
 
   try {
-    const result = await getDashboardDataCallable({ timePeriod: period, customRange: payloadRange });
+    // Ensure period is compatible with BETimePeriod if they differ
+    const result = await getDashboardDataCallable({ timePeriod: period as BETimePeriod, customRange: payloadRange });
     
     if (!result.data.success || !result.data.data) {
       console.error('Failed to get dashboard data from CF:', result.data.error || 'No data returned');
       throw new Error(result.data.error || 'Failed to retrieve dashboard data.');
     }
     
-    // The data from CF should be DashboardDataBE. We need to map it to DashboardDataClient.
-    // Key part: Convert admin.firestore.Timestamp in recentOrders to ClientTimestamp.
-    // Other parts of DashboardDataBE are numbers/strings/simple arrays and should map directly to DashboardDataClient fields.
-    const beData = result.data.data as any; // Cast to any for easier mapping temporarily
+    const beData = result.data.data; // Now correctly typed as DashboardDataBE
     
-    const clientRecentOrders = beData.recentOrders.map((order: any) => ({
-        ...order,
-        createdAt: order.createdAt && order.createdAt._seconds ? ClientTimestamp.fromDate(new Date(order.createdAt._seconds * 1000 + (order.createdAt._nanoseconds || 0) / 1000000)) : ClientTimestamp.now(),
-        updatedAt: order.updatedAt && order.updatedAt._seconds ? ClientTimestamp.fromDate(new Date(order.updatedAt._seconds * 1000 + (order.updatedAt._nanoseconds || 0) / 1000000)) : ClientTimestamp.now(),
-        // Ensure other nested timestamps (if any in Order type) are also converted.
-    })) as Order[];
+    const clientRecentOrders = beData.recentOrders.map((orderBE: OrderBE): ClientOrder => {
+      // Detailed mapping from OrderBE to ClientOrder
+      const mapAddressBEToClient = (addrBE?: OrderAddressBE): ClientOrder['shippingAddress'] | undefined => {
+        if (!addrBE) return undefined;
+        return {
+          address: addrBE.address,
+          city: addrBE.city,
+          state: addrBE.state,
+          postalCode: addrBE.zipCode,
+          country: addrBE.country || 'USA', // Default country if not present
+        };
+      };
+
+      const mapItemsBEToClient = (itemsBE: OrderItemBE[]): ClientOrder['items'] => {
+        return itemsBE.map(itemBE => ({
+          productId: itemBE.productId,
+          name: itemBE.productName,
+          price: itemBE.finalUnitPrice,
+          quantity: itemBE.quantity,
+          image: itemBE.productImage || '/placeholder.svg', // Default image
+        }));
+      };
+      
+      // Handle potential Timestamp object from Firestore
+      const formatTimestamp = (timestampField: unknown): string => {
+        if (!timestampField) return new Date().toISOString();
+
+        if (timestampField instanceof ClientTimestamp) {
+          return timestampField.toDate().toISOString();
+        }
+        if (typeof (timestampField as { toDate?: () => Date }).toDate === 'function') {
+          return (timestampField as { toDate: () => Date }).toDate().toISOString();
+        }
+        if (isSerializedTimestamp(timestampField)) {
+            return new Date(timestampField._seconds * 1000 + timestampField._nanoseconds / 1000000).toISOString();
+        }
+        if (typeof timestampField === 'string') return timestampField;
+        
+        return new Date().toISOString(); 
+      };
+
+      return {
+        id: orderBE.id,
+        userId: orderBE.userId || null,
+        customerName: `${orderBE.shippingAddress?.firstName || ''} ${orderBE.shippingAddress?.lastName || ''}`.trim() || 'N/A',
+        customerEmail: orderBE.customerEmail,
+        shippingAddress: mapAddressBEToClient(orderBE.shippingAddress)!, // Assert non-null if always present
+        billingAddress: mapAddressBEToClient(orderBE.billingAddress) || mapAddressBEToClient(orderBE.shippingAddress)!, // Fallback or assert
+        items: mapItemsBEToClient(orderBE.items),
+        status: orderBE.orderStatus.toLowerCase() as ClientOrder['status'],
+        subtotal: orderBE.subtotal,
+        tax: orderBE.taxAmount,
+        shipping: orderBE.shippingCost,
+        discount: orderBE.cartDiscountAmount,
+        total: orderBE.grandTotal,
+        paymentMethod: orderBE.paymentMethod.toLowerCase() as ClientOrder['paymentMethod'],
+        paymentStatus: orderBE.paymentStatus.toLowerCase() as ClientOrder['paymentStatus'],
+        notes: orderBE.notes || '',
+        createdAt: formatTimestamp(orderBE.createdAt as unknown),
+        updatedAt: formatTimestamp(orderBE.updatedAt as unknown),
+        shippedAt: null, // Not directly in OrderBE, needs logic if available
+        deliveredAt: null, // Not directly in OrderBE, needs logic if available
+      };
+    });
     
     return {
-        salesSummary: beData.salesSummary,
-        productSummary: beData.productSummary,
-        customerSummary: beData.customerSummary,
-        orderStatusSummary: beData.orderStatusSummary,
-        salesByCategory: beData.salesByCategory,
-        salesByPaymentMethod: beData.salesByPaymentMethod,
-        salesOverTime: beData.salesOverTime,
+        salesSummary: beData.salesSummary, // Assuming direct map
+        productSummary: beData.productSummary, // Assuming direct map
+        customerSummary: beData.customerSummary, // Assuming direct map
+        orderStatusSummary: beData.orderStatusSummary, // Assuming direct map
+        salesByCategory: beData.salesByCategory, // Assuming direct map
+        salesByPaymentMethod: beData.salesByPaymentMethod, // Assuming direct map
+        salesOverTime: beData.salesOverTime, // Assuming direct map
         recentOrders: clientRecentOrders,
-    } as DashboardDataClient;
+    };
 
   } catch (error) {
     console.error("Error calling getDashboardDataCallable:", error);

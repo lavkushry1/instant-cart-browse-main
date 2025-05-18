@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useContext } from 'react';
-import { Product } from '@/types/product';
-import { getGuestCart, saveGuestCart, getGuestSavedItems, saveGuestSavedItems } from '@/lib/localStorageUtils'; // Import guest cart utils
+import { Product } from '../types/product';
+import { getGuestCart, saveGuestCart, getGuestSavedItems, saveGuestSavedItems } from '../lib/localStorageUtils'; // Corrected path for localStorageUtils
 import { AuthContext } from './AuthContextDef'; // Corrected import for AuthContext
-import { functionsClient } from '@/lib/firebaseClient';
+import { functionsClient } from '../lib/firebaseClient'; // Corrected path for firebaseClient
 import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions';
 import { toast } from 'sonner';
 import { Timestamp } from 'firebase/firestore'; // For backend CartItemBE addedAt (though not directly used in mapping here)
@@ -165,42 +165,42 @@ export const useCart = () => {
 
   // Helper to map ProductInCartBE or SavedProductDataBE to client Product type
   // Renamed from mapProductInBEToProduct for clarity
-  const mapBEProductToClientProduct = (pBE: ProductInCartBE | SavedProductDataBE): Product => {
+  const mapBEProductToClientProduct = useCallback((pBE: ProductInCartBE | SavedProductDataBE): Product => {
     return {
       id: pBE.id,
       name: pBE.name,
       price: pBE.price,
       images: pBE.images && pBE.images.length > 0 ? pBE.images : ['/placeholder.svg'],
-      description: '', 
-      category: '', 
-      compareAtPrice: pBE.price, 
-      stock: 0, 
+      description: '',
+      category: '',
+      compareAtPrice: pBE.price,
+      stock: 0,
       tags: [],
-      featured: 0, 
-      discount: 0, 
-      createdAt: new Date().toISOString(), 
-      updatedAt: new Date().toISOString(), 
+      featured: 0,
+      discount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       seo: undefined,
     };
-  };
+  }, []);
   
   // Helper to map CartItemBE (from Firestore) to client CartItem (remains same)
-  const mapCartItemBEToCartItem = (itemBE: CartItemBE): CartItem => {
+  const mapCartItemBEToCartItem = useCallback((itemBE: CartItemBE): CartItem => {
     return {
       id: itemBE.productId,
       product: mapBEProductToClientProduct(itemBE.product),
       quantity: itemBE.quantity,
     };
-  };
+  }, [mapBEProductToClientProduct]);
 
   // Helper to map BackendSavedItem (from Firestore) to client CartItem (for saved list)
-  const mapBackendSavedItemToCartItem = (itemBE: BackendSavedItem): CartItem => {
+  const mapBackendSavedItemToCartItem = useCallback((itemBE: BackendSavedItem): CartItem => {
     return {
       id: itemBE.productId,
       product: mapBEProductToClientProduct(itemBE.product), // itemBE.product is SavedProductDataBE
       quantity: 1, // Saved items always have quantity 1
     };
-  };
+  }, [mapBEProductToClientProduct]);
 
   // Load cart AND saved items on mount and auth changes
   useEffect(() => {
@@ -269,7 +269,7 @@ export const useCart = () => {
         loadInitialData();
     }
 
-  }, [isAuthenticated, user, authLoading, functionsClient, isCartInitialized, isSavedItemsInitialized]); // Dependencies for main data load
+  }, [isAuthenticated, user, authLoading, isCartInitialized, isSavedItemsInitialized, mapCartItemBEToCartItem, mapBackendSavedItemToCartItem]); // Dependencies for main data load
 
   // Effects for resetting initialization status on auth change
   const prevIsAuthenticated = usePrevious(isAuthenticated);

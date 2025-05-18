@@ -10,14 +10,20 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Product, ProductCreationData, ProductUpdateData } from '@/services/productService'; 
-import { Category } from '@/services/categoryService'; 
-import AdminLayout from '@/components/layout/AdminLayout';
+import { Product } from '../../services/productService';
+import { Category } from '../../services/categoryService';
+import AdminLayout from '../../components/layout/AdminLayout';
 
-import { functionsClient, firebaseApp } from '@/lib/firebaseClient';
+import { functionsClient, firebaseApp } from '../../lib/firebaseClient';
 import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions';
 import { Timestamp as ClientTimestamp, doc, collection, getFirestore } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+
+// Define types for product creation and update, based on client-side Product type
+export type ProductCreationData = Omit<Product, 'id' | 'averageRating' | 'reviewCount' | 'createdAt' | 'updatedAt'> & { 
+  id?: string; // Allow pre-generated ID for creation
+};
+export type ProductUpdateData = Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>;
 
 // Define direct response types for Cloud Functions
 interface CreateProductAdminResponse { success: boolean; product?: Product; error?: string; }
@@ -69,31 +75,32 @@ const emptyProductForm: ProductCreationData = {
   name: '',
   description: '',
   price: 0,
+  originalPrice: 0,
+  sku: '',
   categoryId: '',
+  categoryName: '',
   stock: 0,
   images: [],
   tags: [],
   isEnabled: true,
   featured: false,
-  // SEO Fields
   slug: '',
   seoTitle: '',
   seoDescription: '',
-  // Omitting averageRating, reviewCount as they are not set by form
 };
 
 // Client-side slug generation helper (duplicate from backend for now)
 const generateSlugForClient = (name: string): string => {
-  if (!name) return ''; 
+  if (!name) return '';
   return name
     .toString()
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, '-')      
-    .replace(/[^\w\-]+/g, '')   
-    .replace(/\-\-+/g, '-')     
-    .replace(/^-+/, '')         
-    .replace(/-+$/, '');        
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '')
+    .replace(/--+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
 };
 
 const ProductForm = () => {
@@ -199,9 +206,10 @@ const ProductForm = () => {
         const downloadUrl = await getDownloadURL(snapshot.ref);
         uploadedUrls.push(downloadUrl);
         toast.success(`Uploaded ${file.name} successfully!`, { duration: 1500 });
-      } catch (uploadError: any) {
+      } catch (uploadError: unknown) {
         console.error(`Error uploading ${file.name}:`, uploadError);
-        toast.error(`Failed to upload ${file.name}: ${uploadError.message}`);
+        const message = uploadError instanceof Error ? uploadError.message : 'Upload failed.';
+        toast.error(`Failed to upload ${file.name}: ${message}`);
         // Decide if one failure should stop all or continue
         // For now, continue and collect successful URLs
       }
@@ -274,9 +282,10 @@ const ProductForm = () => {
         toast.success(`Product ${isEditMode ? 'updated' : 'added'}!`);
         navigate('/admin/products');
       } else { toast.error(responseData.error || 'Save failed.'); }
-    } catch (e:any) { 
+    } catch (e: unknown) {
       console.error("Error in handleSubmit:", e);
-      toast.error(`Save error: ${e.message}`); 
+      const message = e instanceof Error ? e.message : 'An unexpected error occurred.';
+      toast.error(`Save error: ${message}`); 
     }
     setIsSaving(false);
   };

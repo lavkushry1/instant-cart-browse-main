@@ -7,8 +7,11 @@ import {
   getAllOffersBE,
   updateOfferBE,
   deleteOfferBE,
-} from '../../../src/services/offerService'; // Adjust path if your folder structure differs
-import { OfferCreationData, OfferUpdateData } from '../../../src/services/offerService'; // Import types
+} from '../services/offerServiceBE'; // Corrected path to backend service
+import { 
+    OfferCreationDataFromClient, // Corrected type import
+    OfferUpdateDataFromClient    // Corrected type import
+} from '../services/offerServiceBE'; // Corrected path for types
 
 // Helper to check for admin role (example, adapt to your auth setup)
 const ensureAdmin = (context: functions.https.CallableContext) => {
@@ -24,7 +27,7 @@ const ensureAdmin = (context: functions.https.CallableContext) => {
 
 console.log("(Cloud Functions) offers.functions.ts: Initializing with LIVE logic...");
 
-export const createOfferCF = functions.https.onCall(async (data: OfferCreationData, context) => {
+export const createOfferCF = functions.https.onCall(async (data: OfferCreationDataFromClient, context) => {
   console.log("(Cloud Function) createOfferCF called with data:", data);
   ensureAdmin(context); 
   try {
@@ -90,7 +93,7 @@ export const getAllOffersAdminCF = functions.https.onCall(async (_data, context)
   }
 });
 
-export const updateOfferCF = functions.https.onCall(async (data: { offerId: string; updateData: OfferUpdateData }, context) => {
+export const updateOfferCF = functions.https.onCall(async (data: { offerId: string; updateData: OfferUpdateDataFromClient }, context) => {
   console.log("(Cloud Function) updateOfferCF called with data:", data);
   ensureAdmin(context);
   try {

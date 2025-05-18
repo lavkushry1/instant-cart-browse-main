@@ -13,10 +13,10 @@ import {
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
-import { useAuth } from '@/hooks/useAuth';
-import { functionsClient } from '@/lib/firebaseClient';
+import { useAuth } from '../hooks/useAuth';
+import { functionsClient } from '../lib/firebaseClient';
 import { httpsCallable, HttpsCallable } from 'firebase/functions';
-import { ProductReview as BEProductReview } from '@/services/productService';
+import { ProductReview as BEProductReview } from '../services/productService';
 import { Timestamp } from 'firebase/firestore';
 
 export interface Review {
@@ -129,9 +129,10 @@ const ProductReviews = ({ productId, productName }: ProductReviewsProps) => {
           toast.error(result.data.error || 'Failed to load product reviews');
           setAverageRating(0); // Reset on error
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error fetching product reviews:', error);
-        toast.error(`Failed to load product reviews: ${error.message || 'Unknown error'}`);
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        toast.error(`Failed to load product reviews: ${message}`);
         setAverageRating(0); // Reset on error
       } finally {
         setIsLoading(false);
@@ -141,7 +142,7 @@ const ProductReviews = ({ productId, productName }: ProductReviewsProps) => {
     if (productId) { // Ensure productId is available
       fetchReviews();
     }
-  }, [productId]); // Depend on productId to refetch if it changes
+  }, [productId, getProductReviewsCallable]); // Depend on productId and callable to refetch if they change
 
   // Handle star rating click
   const handleRatingClick = (rating: number) => {
@@ -215,9 +216,10 @@ const ProductReviews = ({ productId, productName }: ProductReviewsProps) => {
         console.error('Error submitting review:', result.data.error);
         toast.error(result.data.error || 'Failed to submit review');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error submitting review:', error);
-      toast.error(`Failed to submit review: ${error.message || 'Unknown error'}`);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to submit review: ${message}`);
     } finally {
       setIsSubmitting(false);
     }

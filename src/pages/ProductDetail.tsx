@@ -5,21 +5,21 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ShoppingCart, Heart, ChevronLeft, Star, Check, AlertCircle, ChevronRight } from 'lucide-react';
-import { getProductByIdBE } from '@/services/productService';
-import { getProductSEO } from '@/services/seoService';
-import { Product } from '@/types/product';
-import { SEO } from '@/types/product';
-import { useCart } from '@/hooks/useCart';
-import { useAuth } from '@/hooks/useAuth';
+import { getProductById } from '../services/productService';
+import { getProductSEO } from '../services/seoService';
+import { Product } from '../types/product';
+import { SEO } from '../types/product';
+import { useCart } from '../hooks/useCart';
+import { useAuth } from '../hooks/useAuth';
 import { 
   getGuestWishlist, 
   addToGuestWishlist, 
   removeFromGuestWishlist, 
   isProductInGuestWishlist 
-} from '@/lib/localStorageUtils';
-import Layout from '@/components/layout/Layout';
-import ProductReviews from '@/components/ProductReviews';
-import SEOComponent from '@/components/SEO';
+} from '../lib/localStorageUtils';
+import Layout from '../components/layout/Layout';
+import ProductReviews from '../components/ProductReviews';
+import SEOComponent from '../components/SEO';
 
 const ProductDetail = () => {
   const { productId } = useParams<{ productId: string }>();
@@ -46,7 +46,7 @@ const ProductDetail = () => {
       try {
         setLoading(true);
         const [productDataBE, seoData] = await Promise.all([
-          getProductByIdBE(productId),
+          getProductById(productId),
           getProductSEO(productId)
         ]);
         
@@ -67,8 +67,8 @@ const ProductDetail = () => {
             discount: 0, // Default discount, as it's not in BE product
             featured: productDataBE.featured ? 1 : 0, // Coerce boolean to number, or default
             // Convert Timestamps to string representations (e.g., ISO string)
-            createdAt: productDataBE.createdAt && typeof (productDataBE.createdAt as any).toDate === 'function' ? (productDataBE.createdAt as any).toDate().toISOString() : new Date().toISOString(),
-            updatedAt: productDataBE.updatedAt && typeof (productDataBE.updatedAt as any).toDate === 'function' ? (productDataBE.updatedAt as any).toDate().toISOString() : new Date().toISOString(),
+            createdAt: productDataBE.createdAt && typeof productDataBE.createdAt.toDate === 'function' ? productDataBE.createdAt.toDate().toISOString() : new Date().toISOString(),
+            updatedAt: productDataBE.updatedAt && typeof productDataBE.updatedAt.toDate === 'function' ? productDataBE.updatedAt.toDate().toISOString() : new Date().toISOString(),
             // seo can remain optional or be mapped if seoData is meant to be part of product object
           };
           setProduct(clientProduct);
@@ -367,9 +367,12 @@ const ProductDetail = () => {
                     onClick={() => {
                       if (!product) return; // Should not happen if button is rendered
                       if (isAuthenticated) {
-                        isProductInWishlist(product.id) 
-                          ? removeFromWishlist(product.id) 
-                          : addToWishlist(product.id);
+                        const currentlyInWishlist = isProductInWishlist(product.id);
+                        if (currentlyInWishlist) {
+                          removeFromWishlist(product.id);
+                        } else {
+                          addToWishlist(product.id);
+                        }
                       } else {
                         // Guest wishlist logic
                         if (isInGuestWishlistLocal) {

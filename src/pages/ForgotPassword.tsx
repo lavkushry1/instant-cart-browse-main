@@ -3,21 +3,21 @@ import { Link } from 'react-router-dom';
 // import { getAuth, sendPasswordResetEmail } from 'firebase/auth'; // getAuth removed
 import { sendPasswordResetEmail } from 'firebase/auth';
 // import { firebaseApp } from '@/lib/firebaseClient'; // firebaseApp removed
-import { authClient } from '@/lib/firebaseClient'; // authClient imported directly
+import { authClient } from '../lib/firebaseClient'; // authClient imported directly
 import { toast } from 'react-hot-toast';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
+import { FirebaseError } from 'firebase/app';
 
 // const auth = getAuth(firebaseApp); // Removed: use authClient directly
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // const [message, setMessage] = useState(''); // Removed message state
   const [emailSent, setEmailSent] = useState(false); // To change card description
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -32,7 +32,6 @@ const ForgotPassword = () => {
     }
 
     setIsSubmitting(true);
-    // setMessage(''); // Removed
 
     if (!authClient || Object.keys(authClient).length === 0) { // Check if authClient is valid
       toast.error('Authentication service is not available. Please try again later.');
@@ -44,16 +43,14 @@ const ForgotPassword = () => {
       await sendPasswordResetEmail(authClient, email); // Use authClient
       toast.success('Password reset email sent! Please check your inbox (and spam folder).');
       setEmailSent(true);
-      // setEmail(''); // Optionally clear email field, or let user see what they submitted
-    } catch (error: any) {
-      console.error('Error sending password reset email:', error);
-      if (error.code === 'auth/user-not-found') {
-        toast.error('No user found with this email address. Please check the email and try again.');
-      } else if (error.code === 'auth/invalid-email') {
-        toast.error('The email address is not valid.');
-      } else {
-        toast.error(error.message || 'Failed to send password reset email. Please try again.');
+    } catch (error: unknown) {
+      console.error("Error sending password reset email:", error);
+      const firebaseError = error as FirebaseError; // Cast to FirebaseError for code
+      let userMessage = "Failed to send password reset email. Please try again.";
+      if (firebaseError.code === 'auth/user-not-found') {
+        userMessage = "No user found with this email address.";
       }
+      toast.error(userMessage);
       setEmailSent(false); // Ensure form is shown again on error
     } finally {
       setIsSubmitting(false);
@@ -90,11 +87,6 @@ const ForgotPassword = () => {
                       disabled={isSubmitting}
                     />
                   </div>
-                  {/* {message && ( // Message display removed, relying on toasts
-                    <p className={`text-sm ${message.startsWith('Failed') ? 'text-red-600' : 'text-green-600'}`}>
-                      {message}
-                    </p>
-                  )} */}
                 </CardContent>
                 <CardFooter className="flex flex-col space-y-4">
                   <Button 

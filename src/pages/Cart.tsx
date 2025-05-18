@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'; // Added useMemo
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { useCart } from '@/hooks/useCart';
-import { useOffers } from '@/contexts/OfferContext'; // Import useOffers
+import { useOffers } from '@/contexts/useOfferHook'; // Changed import path
 import { CartItem as ServiceCartItem } from '@/services/offerService'; // Import ServiceCartItem type
 import SavedItems from '@/components/cart/SavedItems';
 import { Button } from '@/components/ui/button';

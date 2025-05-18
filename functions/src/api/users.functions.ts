@@ -7,17 +7,17 @@ import {
   updateUserProfileBE,
   deleteUserProfileBE,
   updateUserRolesBE,
-  getAllUserProfilesBE, // Added
-  UserProfileCreationData, 
-  UserProfileUpdateData,
-  UserRole,
-  GetAllUserProfilesOptionsBE, // Added
-  addUserAddressBE, // Import new BE function
-  updateUserAddressBE, // Import new BE function
-  deleteUserAddressBE, // Import new BE function
-  setDefaultUserAddressBE, // Import new BE function
-  UserProfileAddressBE // Import type for address data
-} from '../../../src/services/userService'; // Adjust path
+  getAllUserProfilesBE,
+  UserProfileCreationDataBE,
+  UserProfileUpdateDataBE,
+  UserRoleBE,
+  GetAllUserProfilesOptionsBE,
+  addUserAddressBE,
+  updateUserAddressBE,
+  deleteUserAddressBE,
+  setDefaultUserAddressBE,
+  UserProfileAddressBE
+} from '../services/userServiceBE';
 
 const ensureAuthenticated = (context: functions.https.CallableContext): string => {
   if (!context.auth) {
@@ -39,7 +39,7 @@ console.log("(Cloud Functions) users.functions.ts: Initializing with LIVE logic.
 export const onUserCreateAuthTriggerCF = functions.auth.user().onCreate(async (user) => {
   console.log(`(Cloud Function Trigger) onUserCreateAuthTriggerCF for UID: ${user.uid}, Email: ${user.email}`);
   try {
-    const profileData: Partial<UserProfileCreationData> = {
+    const profileData: Partial<UserProfileCreationDataBE> = {
       email: user.email || '',
       displayName: user.displayName,
       photoURL: user.photoURL,
@@ -106,7 +106,7 @@ export const getAllUserProfilesCF = functions.https.onCall(async (data: GetAllUs
     }
 });
 
-export const updateUserProfileCF = functions.https.onCall(async (data: UserProfileUpdateData, context) => {
+export const updateUserProfileCF = functions.https.onCall(async (data: UserProfileUpdateDataBE, context) => {
   console.log("(Cloud Function) updateUserProfileCF called with data:", data);
   const userId = ensureAuthenticated(context);
   try {
@@ -123,7 +123,7 @@ export const updateUserProfileCF = functions.https.onCall(async (data: UserProfi
   }
 });
 
-export const updateUserRolesCF = functions.https.onCall(async (data: { targetUserId: string; roles: UserRole[] }, context) => {
+export const updateUserRolesCF = functions.https.onCall(async (data: { targetUserId: string; roles: UserRoleBE[] }, context) => {
   console.log("(Cloud Function) updateUserRolesCF called with data:", data);
   ensureAdmin(context); 
   try {
@@ -141,7 +141,7 @@ export const updateUserRolesCF = functions.https.onCall(async (data: { targetUse
   }
 });
 
-export const addUserAddressCF = functions.https.onCall(async (data: UserProfileAddressBE, context) => {
+export const addUserAddressCF = functions.https.onCall(async (data: Omit<UserProfileAddressBE, 'id' | 'createdAt' | 'updatedAt'>, context) => {
   console.log("(Cloud Function) addUserAddressCF called with data:", data);
   const userId = ensureAuthenticated(context);
   try {
@@ -154,7 +154,7 @@ export const addUserAddressCF = functions.https.onCall(async (data: UserProfileA
   }
 });
 
-export const updateUserAddressCF = functions.https.onCall(async (data: { addressId: string; addressData: Partial<UserProfileAddressBE> }, context) => {
+export const updateUserAddressCF = functions.https.onCall(async (data: { addressId: string; addressData: Partial<Omit<UserProfileAddressBE, 'id' | 'createdAt' | 'updatedAt'>> }, context) => {
   console.log("(Cloud Function) updateUserAddressCF called with data:", data);
   const userId = ensureAuthenticated(context);
   try {

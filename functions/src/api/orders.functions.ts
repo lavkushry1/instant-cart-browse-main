@@ -77,14 +77,18 @@ export const getOrderByIdCF = functions.https.onCall(async (data: { orderId: str
   }
 });
 
-export const getOrdersForUserCF = functions.https.onCall(async (data: { limit?: number; startAfter?: unknown }, context) => {
+export const getOrdersForUserCF = functions.https.onCall(async (data: { limit?: number; startAfter?: string | null }, context) => {
   console.log("(Cloud Function) getOrdersForUserCF called with data:", data);
   const userId = ensureAuthenticated(context);
   try {
+    // Note: If data.startAfter is a string (e.g., document ID from client for cursor),
+    // it needs to be converted to an admin.firestore.DocumentSnapshot before being passed to getOrdersBE.
+    // This typically involves fetching the document by that ID.
+    // For now, direct usage of client-sent startAfter as DocumentSnapshot is not implemented.
     const options: GetOrdersOptionsBE = {
         userId: userId,
         limit: data.limit || 10,
-        startAfter: data.startAfter as any, // Cast to any to resolve linter error
+        startAfter: undefined, // Explicitly undefined as client's startAfter needs processing
         sortBy: 'createdAt',
         sortOrder: 'desc'
     };

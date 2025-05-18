@@ -1,9 +1,9 @@
 import * as admin from 'firebase-admin'; // Import for Timestamp and DocumentSnapshot types
 // Import Firebase Admin resources
 import {
-  db, // Firestore instance from firebaseAdmin.ts
+  firestoreDB as db, // Corrected import for Firestore instance
   adminInstance // For FieldValue, Timestamp etc. from firebaseAdmin.ts
-} from '../../../src/lib/firebaseAdmin'; // Corrected path for functions/* structure
+} from '../lib/firebaseAdmin'; // Corrected path for functions/* structure
 const ORDERS_COLLECTION = 'orders';
 const PRODUCTS_COLLECTION = 'products'; // For inventory updates
 
@@ -163,7 +163,8 @@ export const updateOrderBE = async (orderId: string, updateData: OrderUpdateData
         ...updateData, 
         updatedAt: adminInstance.firestore.FieldValue.serverTimestamp() 
     };
-    await docRef.update(dataToUpdate as { [key: string]: any }); 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await docRef.update(dataToUpdate as Record<string, any>);
     const updatedDoc = await docRef.get();
     if (!updatedDoc.exists) throw new Error('Order not found after update');
     return { id: updatedDoc.id, ...updatedDoc.data() } as Order;

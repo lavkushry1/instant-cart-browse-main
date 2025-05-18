@@ -1,5 +1,5 @@
-import { firestoreDB, Timestamp } from '../lib/firebaseAdmin'; // Corrected Admin SDK path, added Timestamp
-import { Product } from '../../../src/types/product'; // Assuming Product type from frontend is sufficient for product data
+import { firestoreDB, Timestamp, adminInstance } from '../lib/firebaseAdmin'; // Corrected relative path
+import { ProductBE as Product } from '../types/productBE'; // Updated import
 import { CartItemBE, ProductInCartBE } from './cartService'; // Re-use CartItemBE for structure if suitable
 
 // Simplified interface for product data stored in saved items
@@ -46,7 +46,7 @@ export const addSavedItemBE = async (
     const newSavedItem: SavedItemBE = {
         id: productId,
         productData,
-        addedAt: Timestamp.now(), // Use imported Timestamp
+        addedAt: Timestamp.now(), // This should use adminInstance.firestore.Timestamp.now() or just Timestamp.now() if Timestamp is admin.firestore.Timestamp
     };
 
     await savedItemDocRef.set(newSavedItem);
@@ -134,9 +134,9 @@ export const moveSavedItemToCartBE = async (userId: string, productId: string): 
         
         const newCartItem: CartItemBE = {
             productId: productId,
-            product: cartProductData, // Corrected field name from productData to product
+            product: cartProductData, 
             quantity: 1,
-            addedAt: Timestamp.now(), // Use imported Timestamp
+            addedAt: Timestamp.now(), // Same here, ensure it resolves to admin.firestore.Timestamp.now()
         };
 
         transaction.set(cartItemDocRef, newCartItem);

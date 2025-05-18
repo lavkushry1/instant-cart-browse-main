@@ -8,7 +8,7 @@ import {
   updateProfile as firebaseUpdateProfile,
   User as FirebaseUser // Firebase's User type
 } from 'firebase/auth';
-import { firebaseApp, functionsClient } from '@/lib/firebaseClient'; // Assuming firebaseApp is exported for getAuth
+import { firebaseApp, functionsClient } from '../lib/firebaseClient'; // Corrected path
 import { AuthContext, AuthContextType, User, LoginCredentials, RegisterData, UpdateUserProfileData, UserAddress, ClientOrder, GetUserOrdersResponse } from './AuthContextDef';
 import { httpsCallable, HttpsCallable, HttpsCallableResult } from 'firebase/functions';
 import { getFunctions } from 'firebase/functions';
@@ -17,9 +17,10 @@ import { toast } from 'react-hot-toast';
 import { 
   getGuestWishlist, clearGuestWishlist, 
   getGuestCart, clearGuestCart, CartItemLocalStorage,
-  getGuestSavedItems, clearGuestSavedItems // Added for saved items
-} from '@/lib/localStorageUtils';
-import { Product } from '@/types/product';
+  getGuestSavedItems, clearGuestSavedItems 
+} from '../lib/localStorageUtils'; // Corrected path
+import { Product } from '../types/product'; // Corrected path
+import { DocumentSnapshot as ClientDocumentSnapshot } from 'firebase/firestore'; // Import ClientDocumentSnapshot
 
 // Define the expected direct return type from the Cloud Function for user profile
 interface UserProfileResponse { success: boolean; profile?: User; error?: string; } // User type here should match AuthContextDef's User
@@ -41,7 +42,8 @@ interface SetDefaultAddressCFPayload { addressId: string; }
 interface SetDefaultAddressCFResponse { success: boolean; message?: string; error?: string; }
 
 // Interface for GetUserOrders CF data and response
-interface GetUserOrdersCFPayload { limit?: number; startAfter?: any; }
+ 
+type AuthGetUserOrdersCFPayload = { limit: number; startAfter?: string | null; };
 
 // Interface for MergeGuestCart CF data and response (NEW)
 interface MergeGuestCartCFPayload { items: CartItemLocalStorage[] }
@@ -54,7 +56,7 @@ interface AddSavedItemCFPayload_AuthProvider {
 }
 interface AddSavedItemCFResponse_AuthProvider { // Assuming general success/error structure
   success: boolean;
-  savedItem?: any; // Type of savedItem can be more specific if BE type is imported safely
+  savedItem?: Record<string, unknown>; // Changed from any
   error?: string;
 }
 
@@ -65,7 +67,7 @@ let addAddressCallable: HttpsCallable<AddAddressCFData, AddAddressCFResponse> | 
 let updateAddressCallable: HttpsCallable<UpdateAddressCFPayload, UpdateAddressCFResponse> | undefined;
 let deleteAddressCallable: HttpsCallable<DeleteAddressCFPayload, DeleteAddressCFResponse> | undefined;
 let setDefaultAddressCallable: HttpsCallable<SetDefaultAddressCFPayload, SetDefaultAddressCFResponse> | undefined;
-let getUserOrdersCallable: HttpsCallable<GetUserOrdersCFPayload, GetUserOrdersResponse> | undefined;
+let getUserOrdersCallable: HttpsCallable<AuthGetUserOrdersCFPayload, GetUserOrdersResponse> | undefined;
 let mergeGuestCartCallable: HttpsCallable<MergeGuestCartCFPayload, MergeGuestCartCFResponse> | undefined; // NEW
 let addSavedItemCallable_AuthProvider: HttpsCallable<AddSavedItemCFPayload_AuthProvider, AddSavedItemCFResponse_AuthProvider> | undefined;
 
@@ -577,25 +579,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // --- End Address Management Functions ---
 
   // --- Order History Function ---
-  const getUserOrders = async (limit?: number, startAfter?: any): Promise<GetUserOrdersResponse> => {
-    if (!firebaseUserInternal || !getUserOrdersCallable) {
-      console.error("User not authenticated or getUserOrders function not available.");
-      throw new Error("Operation failed: User not authenticated or service unavailable.");
+  const getUserOrders = async (limit?: number, startAfterInput?: ClientDocumentSnapshot | null): Promise<GetUserOrdersResponse> => {
+    if (!auth.currentUser || !getUserOrdersCallable) {
+      console.warn("User not authenticated or getUserOrdersCallable not available.");
+      return { orders: [], lastVisible: null, totalCount: 0 }; 
     }
-    // No need to setIsLoading(true) here as this function is typically called on demand for a specific view,
-    // and the view itself should handle its own loading state.
     try {
-      const payload: GetUserOrdersCFPayload = { limit, startAfter };
-      const result: HttpsCallableResult<GetUserOrdersResponse> = await getUserOrdersCallable(payload);
-      if (result.data) { // Assuming the CF directly returns the GetUserOrdersResponse structure (which includes success implicitly or orders array)
-        return result.data;
+      const startAfterString: string | null = startAfterInput ? startAfterInput.id : null;
+      // Define expected CF response type inline or import if it becomes complex/reused
+      type CFGetUserOrdersResponse = 
+        | { success: true; orders: ClientOrder[]; lastVisible?: ClientDocumentSnapshot | null; totalCount?: number; error?: never }
+        | { success: false; error: string; orders?: never; lastVisible?: never; totalCount?: never };
+
+      const result = await getUserOrdersCallable({ limit, startAfter: startAfterString }) as HttpsCallableResult<CFGetUserOrdersResponse>;
+
+      if (result.data.success) {
+        return { 
+          orders: result.data.orders || [], 
+          lastVisible: result.data.lastVisible || null, 
+          totalCount: result.data.totalCount || 0
+        };
       } else {
-        // This case should ideally not happen if CF always returns the structure or throws an error
-        throw new Error("Failed to get user orders: Invalid response from server.");
+        toast.error(result.data.error || "Failed to fetch user orders.");
+        return { orders: [], lastVisible: null, totalCount: 0 }; 
       }
     } catch (error) {
       console.error("Error fetching user orders:", error);
-      throw error; // Re-throw for the UI component to handle
+      toast.error("An error occurred while fetching your orders.");
+      return { orders: [], lastVisible: null, totalCount: 0 }; 
     }
   };
 

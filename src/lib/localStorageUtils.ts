@@ -132,7 +132,7 @@ export const clearGuestCart = (): void => {
 // --- Guest Saved For Later Items (Stores array of CartItem-like objects) ---
 const GUEST_SAVED_ITEMS_KEY = 'guestSavedItems';
 
-interface SavedCartItem extends CartItemLocalStorage {} // Alias for clarity, structure is the same
+type SavedCartItem = CartItemLocalStorage; // Changed to type alias
 
 export const getGuestSavedItems = (): SavedCartItem[] => {
   try {

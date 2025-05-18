@@ -1,4 +1,5 @@
 import { createContext } from 'react';
+import { Timestamp as ClientTimestamp, DocumentSnapshot as ClientDocumentSnapshot } from 'firebase/firestore'; // Import ClientTimestamp and ClientDocumentSnapshot
 
 // Define types directly or import from a dedicated shared types file if they grow.
 export interface UserAddress {
@@ -23,10 +24,10 @@ export interface User {
   roles: string[]; // e.g., ['customer', 'admin']
   // Optional fields that might come from Firestore profile
   addresses?: UserAddress[]; // Use the detailed UserAddress type
-  preferences?: any; // Define more specific Preferences type if needed
-  createdAt?: any; // Could be string, Date, or Firestore Timestamp representation
-  updatedAt?: any;
-  lastLoginAt?: any;
+  preferences?: { theme?: 'light' | 'dark'; newsletterSubscribed?: boolean; }; // More specific type
+  createdAt?: string | Date | ClientTimestamp | null;   // More specific type
+  updatedAt?: string | Date | ClientTimestamp | null;   // More specific type
+  lastLoginAt?: string | Date | ClientTimestamp | null; // More specific type
 }
 
 export interface LoginCredentials {
@@ -84,7 +85,7 @@ export interface ClientOrder {
 
 export interface GetUserOrdersResponse {
     orders: ClientOrder[];
-    lastVisible?: any; // For pagination, depends on what Firestore snapshot.docs[last] is
+    lastVisible?: ClientDocumentSnapshot | null; // More specific type for client-side snapshot
     totalCount?: number;
 }
 
@@ -107,7 +108,7 @@ export interface AuthContextType {
   setDefaultAddress: (addressId: string) => Promise<boolean>;
 
   // Order History
-  getUserOrders: (limit?: number, startAfter?: any) => Promise<GetUserOrdersResponse>;
+  getUserOrders: (limit?: number, startAfter?: ClientDocumentSnapshot | null) => Promise<GetUserOrdersResponse>; // More specific type for startAfter
 
   // Wishlist Management
   wishlist: string[]; // Array of product IDs

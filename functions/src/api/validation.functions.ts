@@ -3,8 +3,8 @@
 import * as functions from 'firebase-functions/v1';
 import {
   validateZipCodeBE,
-  ZipCodeValidationResult
-} from '../../../src/services/validationService'; // Adjust path as necessary
+  ZipCodeValidationResultBE as ZipCodeValidationResult
+} from '../services/validationServiceBE'; // Corrected path
 
 // Optional: Helper to check for authenticated user if certain validations are user-specific
 // const ensureAuthenticated = (context: functions.https.CallableContext) => { ... };

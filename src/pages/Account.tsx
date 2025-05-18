@@ -228,9 +228,10 @@ const Account = () => {
       if (updatedUser) {
         toast.success('Profile updated successfully');
       }
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
+    } catch (error: unknown) {
+      console.error("Error updating profile:", error);
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      toast.error(`Profile update failed: ${message}`);
     } finally {
       setIsUpdating(false);
     }
@@ -264,9 +265,10 @@ const Account = () => {
       // setShowPasswordForm(false);
       // setSecurityForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       // toast.success('Password updated successfully - (Simulated)'); 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating password:', error);
-      toast.error(error.message || 'Failed to update password. Please try again.');
+      const message = error instanceof Error ? error.message : 'Failed to update password. Please try again.';
+      toast.error(message);
     } finally {
       setIsUpdating(false);
     }
@@ -301,9 +303,10 @@ const Account = () => {
       setIsAddressFormOpen(false);
       setEditingAddressId(null);
       setAddressForm({ name: '', street: '', city: '', state: '', zipCode: '', country: 'USA', isDefault: false });
-    } catch (error: any) {
-      console.error('Error saving address:', error);
-      toast.error(error.message || 'Failed to save address.');
+    } catch (error: unknown) {
+      console.error("Error adding address:", error);
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      toast.error(`Failed to add address: ${message}`);
     } finally {
       setIsUpdating(false);
     }
@@ -340,9 +343,10 @@ const Account = () => {
       try {
         await deleteAddress(addressId);
         toast.success('Address removed successfully!');
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error removing address:', error);
-        toast.error(error.message || 'Failed to remove address.');
+        const message = error instanceof Error ? error.message : 'Failed to remove address.';
+        toast.error(message);
       } finally {
         setIsUpdating(false);
       }
@@ -356,9 +360,10 @@ const Account = () => {
     try {
       await setDefaultAddress(addressId);
       toast.success('Default address updated!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error setting default address:', error);
-      toast.error(error.message || 'Failed to set default address.');
+      const message = error instanceof Error ? error.message : 'Failed to set default address.';
+      toast.error(message);
     } finally {
       setIsUpdating(false);
     }

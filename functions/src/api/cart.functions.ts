@@ -30,7 +30,7 @@ interface SetItemData {
 // Client-side CartItem structure for mergeGuestCartCF
 interface ClientMergeCartItem {
   id: string; 
-  product: any; // Client's full Product type
+  product: { id: string; name: string; price: number; images?: string[] }; // More specific product type
   quantity: number;
 }
 

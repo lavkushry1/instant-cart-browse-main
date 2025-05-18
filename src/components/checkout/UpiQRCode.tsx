@@ -1,6 +1,6 @@
 // src/components/checkout/UpiQRCode.tsx
 import React, { useEffect, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react'; // Using qrcode.react
+import QRCode from 'react-qr-code'; // Changed import from qrcode.react to react-qr-code and QRCodeSVG to QRCode
 
 // Placeholder for a QR code generation library. 
 // In a real app, you might use a library like 'qrcode.react' or 'react-qr-code'.
@@ -72,18 +72,12 @@ const UpiQRCode: React.FC<UpiQRCodeProps> = ({
     <div className="flex flex-col items-center p-4 bg-white rounded-lg shadow-md">
       <h3 className="text-lg font-semibold mb-3">Scan to Pay with UPI</h3>
       <div className="p-2 bg-gray-100 rounded-md mb-3">
-        <QRCodeSVG 
+        <QRCode 
             value={qrData} 
             size={200} // Adjust size as needed, e.g., 192 for w-48, 224 for w-56
             bgColor="#ffffff"
             fgColor="#000000"
             level="H" // Error correction level: L, M, Q, H
-            imageSettings={{
-                // src: "/path/to/logo.png", // Optional: embed a logo in the QR code
-                // height: 30,
-                // width: 30,
-                // excavate: true,
-            }}
         />
       </div>
       <p className="text-sm text-gray-700 mb-1">

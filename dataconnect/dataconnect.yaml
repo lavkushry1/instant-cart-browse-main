@@ -1,0 +1,12 @@
+specVersion: "v1"
+serviceId: "instant-cart-browse-main"
+location: "asia-south1"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "fdcdb"
+      cloudSql:
+        instanceId: "instant-cart-browse-main-fdc"
+      # schemaValidation: "COMPATIBLE"
+connectorDirs: ["./connector"]

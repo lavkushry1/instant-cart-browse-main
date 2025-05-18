@@ -1,12 +1,9 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 
-// Initialize Firebase Admin SDK if not already initialized
-if (admin.apps.length === 0) {
-  admin.initializeApp();
-}
+// Use shared admin instance
+import { firestoreDB as firestore, adminInstance } from '../lib/firebaseAdmin';
 
-const firestore = admin.firestore(); // Use this for Firestore operations
 // const auth = admin.auth(); // If needed for auth operations
 
 // Simplified Product structure for cart items on the backend
@@ -42,7 +39,7 @@ export interface UserCartBE {
 // Assuming CartItemLocalStorage sends product: Product (full client Product type)
 interface ClientCartItem {
   id: string; // This is product.id from client
-  product: any; // Client's full Product type, structure defined in frontend Product type
+  product: { id: string; name: string; price: number; images?: string[] }; // More specific type for product
   quantity: number;
 }
 
@@ -93,7 +90,7 @@ export const mergeGuestCartToFirestore = async (
 
       try {
         const docSnapshot = await productDocRef.get();
-        const nowTimestamp = admin.firestore.Timestamp.now(); // Corrected
+        const nowTimestamp = adminInstance.firestore.Timestamp.now(); // Use adminInstance
 
         if (docSnapshot.exists) {
           // Item exists, update quantity
@@ -112,7 +109,7 @@ export const mergeGuestCartToFirestore = async (
             productId: productId,
             quantity: guestItem.quantity,
             product: productDataForBE,
-            addedAt: nowTimestamp,
+            addedAt: nowTimestamp, // Use variable from adminInstance
           };
           batch.set(productDocRef, newCartItem);
           functions.logger.info(`Adding new product ${productId} with quantity ${guestItem.quantity} for user ${uid}.`);
@@ -226,7 +223,7 @@ export const setItemInUserCartBE = async (
           price: productData.price || 0,
           images: productData.images || [],
         },
-        addedAt: admin.firestore.Timestamp.now(),
+        addedAt: adminInstance.firestore.Timestamp.now(), // Use adminInstance
       };
       await productDocRef.set(cartItemData, { merge: true }); 
       functions.logger.info(`Set product ${productId} with quantity ${quantity} for user ${uid}.`);

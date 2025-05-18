@@ -7,8 +7,11 @@ import {
   getAllCategoriesBE,
   updateCategoryBE,
   deleteCategoryBE,
-} from '../../../src/services/categoryService'; // Adjust path
-import { CategoryCreationData, CategoryUpdateData } from '../../../src/services/categoryService';
+} from '../services/categoryServiceBE'; // Corrected path
+import { 
+    CategoryCreationDataFromClient, // Corrected type
+    CategoryUpdateDataFromClient    // Corrected type
+} from '../services/categoryServiceBE'; // Corrected path
 
 const ensureAdmin = (context: functions.https.CallableContext) => {
   if (!context.auth || !context.auth.token.admin) { 
@@ -18,7 +21,7 @@ const ensureAdmin = (context: functions.https.CallableContext) => {
 
 console.log("(Cloud Functions) categories.functions.ts: Initializing with LIVE logic...");
 
-export const createCategoryCF = functions.https.onCall(async (data: CategoryCreationData, context) => {
+export const createCategoryCF = functions.https.onCall(async (data: CategoryCreationDataFromClient, context) => {
   console.log("(Cloud Function) createCategoryCF called with data:", data);
   ensureAdmin(context);
   try {
@@ -92,7 +95,7 @@ export const getAllCategoriesCF = functions.https.onCall(async (data, context) =
   }
 });
 
-export const updateCategoryCF = functions.https.onCall(async (data: { categoryId: string; updateData: CategoryUpdateData }, context) => {
+export const updateCategoryCF = functions.https.onCall(async (data: { categoryId: string; updateData: CategoryUpdateDataFromClient }, context) => {
   console.log("(Cloud Function) updateCategoryCF called with data:", data);
   ensureAdmin(context);
   try {

@@ -1,10 +1,11 @@
 // functions/src/services/adminServiceBE.ts
 
+import * as admin from 'firebase-admin';
 import {
-  db, // Firestore instance from firebaseAdmin.ts
-  adminInstance // For FieldValue, Timestamp etc. from firebaseAdmin.ts
-} from '../../lib/firebaseAdmin'; // Corrected path
-import { SiteSettings } from '../../../src/services/adminService'; // Import type from src
+  firestoreDB as db,
+  adminInstance
+} from '../lib/firebaseAdmin'; // Corrected relative path
+import { SiteSettingsBE as SiteSettings } from '../types/adminSettingsBE'; // Updated import
 
 const ADMIN_SETTINGS_COLLECTION = 'admin_settings';
 const SITE_CONFIG_DOC_ID = 'site_config';

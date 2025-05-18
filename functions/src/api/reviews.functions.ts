@@ -13,10 +13,10 @@ import {
   // GetReviewsAdminOptionsBE, // Removed
   addProductReviewBE,
   getProductReviewsBE,
-  ProductReview,
-  GetProductReviewsOptionsBE
-} from '../../../src/services/productService'; // CORRECTED PATH
-import { adminInstance } from '../../../src/lib/firebaseAdmin'; // CORRECTED PATH - Changed to adminInstance
+  type ProductReviewBE as ProductReview,
+  type GetProductReviewsOptionsBE
+} from '../services/productServiceBE'; // Corrected path and file name
+import { adminInstance } from '../lib/firebaseAdmin'; // Corrected path
 
 const ensureAuthenticated = (context: functions.https.CallableContext): string => {
   if (!context.auth) {
@@ -47,7 +47,7 @@ const getReviewByIdForPermissionCheckBE = async (productId: string, reviewId: st
 };
 
 // Initialize Firebase Admin SDK if not already done (idempotent)
-adminInstance;
+// adminInstance; // Removed as it's an unused expression and initialization is handled by import
 
 console.log("(Cloud Functions) reviews.functions.ts: Initializing...");
 
@@ -84,7 +84,7 @@ export const addReviewCF = functions.https.onCall(async (data: AddReviewCFData, 
 interface GetProductReviewsCFData {
     productId: string;
     limit?: number;
-    startAfter?: any; // Simplified for now; client needs to send serializable cursor data
+    startAfter?: string | null; // Type for client-sent cursor (e.g., last review ID)
 }
 
 export const getProductReviewsCF = functions.https.onCall(async (data: GetProductReviewsCFData, context) => {
@@ -94,11 +94,12 @@ export const getProductReviewsCF = functions.https.onCall(async (data: GetProduc
     }
 
     try {
+        // Note: Client-sent data.startAfter (e.g. a string ID) needs to be converted 
+        // to an admin.firestore.DocumentSnapshot for use with getProductReviewsBE.
+        // This conversion (e.g., fetching the doc by ID) is not implemented here.
         const options: GetProductReviewsOptionsBE = {
             limit: data.limit || 10,
-            // Full startAfter (DocumentSnapshot) handling from client to admin SDK is complex.
-            // Client would typically send specific values from the last doc to reconstruct cursor.
-            // options.startAfter = data.startAfter ? reconstructAdminSnapshot(data.startAfter) : undefined;
+            // startAfter: undefined, // Explicitly undefined until conversion is implemented
         };
         
         const result = await getProductReviewsBE(data.productId, options);

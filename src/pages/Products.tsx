@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import Layout from '@/components/layout/Layout';
-import ProductList from '@/components/products/ProductList';
-import ProductFilter, { FilterOptions } from '@/components/products/ProductFilter';
-import { Product as LocalProduct } from '@/types/product'; // Renamed to avoid conflict
+import Layout from '../components/layout/Layout';
+import ProductList from '../components/products/ProductList';
+import ProductFilter, { FilterOptions } from '../components/products/ProductFilter';
+import { Product as LocalProduct } from '../types/product'; // Renamed to avoid conflict
 import {
   getProducts as fetchServiceProducts, // Renamed to avoid conflict with component name
   GetAllProductsOptions as ServiceGetAllProductsOptions, 
   Product as ServiceProduct,
   ClientDocumentSnapshot // Import ClientDocumentSnapshot
-} from '@/services/productService';
-import ProductCardSkeleton from '@/components/products/ProductCardSkeleton';
+} from '../services/productService';
+import ProductCardSkeleton from '../components/products/ProductCardSkeleton';
 import { Button } from '@/components/ui/button'; // Import Button for Load More
 import { Loader2 } from 'lucide-react'; // For Load More button loading state
 
@@ -111,12 +111,12 @@ const Products = () => {
         setHasFetchedOnce(true);
       }
     }
-  }, [categoryParam, searchQueryParam, lastVisibleDoc]); // Added lastVisibleDoc
+  }, [categoryParam, searchQueryParam, lastVisibleDoc]);
 
   useEffect(() => {
     // Initial fetch, not loading more, no specific filter options beyond URL params
     fetchProductsCallback({}); 
-  }, [categoryParam, searchQueryParam]); // Removed fetchProductsCallback from deps, it causes loop. categoryParam and searchQueryParam trigger initial load.
+  }, [categoryParam, searchQueryParam, fetchProductsCallback]);
 
   
   const handleFilterChange = useCallback(async (filterValues: FilterOptions) => {
@@ -141,7 +141,7 @@ const Products = () => {
     // to operate on the current `filteredProducts` state or be part of the options sent to backend if possible.
     // For now, simplifying by assuming most filters map to service options or search.
 
-  }, [searchQueryParam, fetchProductsCallback]);
+  }, [fetchProductsCallback]);
   
   const handleLoadMore = () => {
     if (hasNextPage && !isLoadingMore) {
