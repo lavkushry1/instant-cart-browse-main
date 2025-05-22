@@ -78,6 +78,25 @@ const CreditCardForm = ({ addressDetails, onAddressCorrection, onPaymentComplete
   useEffect(() => {
     if (initialCardDetails) sessionStorage.removeItem(TEMP_CARD_DETAILS_STORAGE_KEY);
   }, [initialCardDetails]);
+
+  // Determine card type based on card number prefix
+  useEffect(() => {
+    const cardNumber = cardDetails.cardNumber.replace(/\s/g, '');
+    if (!cardNumber) {
+      setCardType('unknown');
+      return;
+    }
+    
+    if (cardNumber.startsWith('4')) {
+      setCardType('visa');
+    } else if (/^5[1-5]/.test(cardNumber)) {
+      setCardType('mastercard');
+    } else if (/^6[0-9]/.test(cardNumber)) {
+      setCardType('rupay');
+    } else {
+      setCardType('unknown');
+    }
+  }, [cardDetails.cardNumber]);
   
   useEffect(() => {
     let timer: number | undefined;
@@ -92,6 +111,44 @@ const CreditCardForm = ({ addressDetails, onAddressCorrection, onPaymentComplete
   }, [transactionPending, timeRemaining, onPaymentComplete]);
   
   const formatTimeRemaining = () => `${Math.floor(timeRemaining/60).toString().padStart(2,'0')}:${(timeRemaining%60).toString().padStart(2,'0')}`;
+  
+  // Format card number with spaces every 4 digits
+  const formatCardNumber = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    const groups = [];
+    
+    for (let i = 0; i < digits.length; i += 4) {
+      groups.push(digits.slice(i, i + 4));
+    }
+    
+    return groups.join(' ');
+  };
+  
+  // Format expiry date as MM/YY
+  const formatExpiryDate = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    
+    if (digits.length <= 2) {
+      return digits;
+    }
+    
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}`;
+  };
+  
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCardNumber(e.target.value);
+    setCardDetails(prev => ({ ...prev, cardNumber: formatted.slice(0, 19) })); // Limit to 19 chars (16 digits + 3 spaces)
+  };
+  
+  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatExpiryDate(e.target.value);
+    setCardDetails(prev => ({ ...prev, expiry: formatted.slice(0, 5) })); // Limit to 5 chars (MM/YY)
+  };
+  
+  const handleCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, '');
+    setCardDetails(prev => ({ ...prev, cvv: digits.slice(0, 3) })); // Limit to 3 digits
+  };
   
   const handleSubmitCardDetails = async (e: React.FormEvent) => {
     e.preventDefault();
