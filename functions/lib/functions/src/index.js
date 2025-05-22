@@ -45,7 +45,12 @@ exports.categories = { ...categoriesFunctions };
 exports.orders = { ...ordersFunctions };
 exports.reviews = { ...reviewsFunctions };
 exports.admin = { ...adminSettingsFunctions };
-exports.cart = { ...cartFunctions };
+exports.cart = { ...cartFunctions,
+    mergeGuestCartCF: cartFunctions.mergeGuestCartCF,
+    clearUserCartCF: cartFunctions.clearUserCartCF,
+    setItemInUserCartCF: cartFunctions.setItemInUserCartCF,
+    getUserCartCF: cartFunctions.getUserCartCF
+};
 exports.validation = { ...validationFunctions }; // Added for export
 exports.wishlist = { ...wishlistFunctions }; // Added for wishlist export
 exports.savedItems = { ...savedItemsFunctions }; // Added for saved items export
@@ -72,4 +77,3 @@ console.log("Firebase Functions index.ts: All function groups configured for exp
 // correctly interprets these as triggers. Often, triggers are exported at the top level of index.ts:
 // export const onUserCreateAuthTrigger = usersFunctions.onUserCreateAuthTriggerCF;
 // export const onUserDeleteAuthTrigger = usersFunctions.onUserDeleteAuthTriggerCF;
-//# sourceMappingURL=index.js.map
