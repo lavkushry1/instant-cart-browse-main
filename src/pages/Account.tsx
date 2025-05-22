@@ -19,7 +19,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { User as AuthUser, UpdateUserProfileData, UserAddress, ClientOrder, ClientOrderItem } from '@/hooks/AuthContextDef'; // Import User type, UpdateUserProfileData, UserAddress, ClientOrder, ClientOrderItem
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { Eye, EyeOff, Plus, Trash2, Check, Clock, X, MapPin, Edit, Package, ShieldCheck, User, Loader2, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Plus, Trash2, Check, Clock, X, MapPin, Edit, Package, ShieldCheck, User, Loader2, AlertCircle, ExternalLink } from 'lucide-react'; // Added ExternalLink
+import { Link as RouterLink } from 'react-router-dom'; // Added RouterLink
 import { 
   Dialog, 
   DialogContent,
@@ -610,8 +611,13 @@ const Account = () => {
                               <p className="text-sm text-muted-foreground">Items: {order.items.length}</p>
                               {/* Optionally show a few item names or images here later */}
                             </CardContent>
-                            <CardFooter>
-                              <Button variant="outline" size="sm">View Details</Button>
+                            <CardFooter className="flex justify-between items-center">
+                              <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleViewOrderDetails(order); }}>View Details (Modal)</Button>
+                              <Button variant="default" size="sm" asChild onClick={(e) => e.stopPropagation()}>
+                                <RouterLink to={`/order-tracking/${order.id}`}>
+                                  Track Order <ExternalLink className="ml-2 h-4 w-4" />
+                                </RouterLink>
+                              </Button>
                             </CardFooter>
                           </Card>
                         ))}

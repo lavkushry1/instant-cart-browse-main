@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, ShoppingBag, CreditCard, Loader2, Shield } from 'lucide-react';
+import { Settings, ShoppingBag, CreditCard, Loader2, Shield, Truck, Percent, Mail } from 'lucide-react'; // Added Truck, Percent, Mail
 import { toast } from 'sonner';
 import AdminCardDetails from '@/components/checkout/AdminCardDetails';
 
@@ -82,8 +82,24 @@ const AdminSettings = () => {
   const [isSavingGeneral, setIsSavingGeneral] = useState(false);
   const [isSavingStoreInfo, setIsSavingStoreInfo] = useState(false);
   const [isSavingUpi, setIsSavingUpi] = useState(false);
+  const [isSavingShippingTax, setIsSavingShippingTax] = useState(false);
+  const [isSavingNotifications, setIsSavingNotifications] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [showStoredCards, setShowStoredCards] = useState(false);
+
+  // Shipping settings
+  const [defaultShippingRate, setDefaultShippingRate] = useState<number | string>(''); // Allow string for empty input
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState<number | string>('');
+
+  // Tax settings
+  const [defaultTaxRate, setDefaultTaxRate] = useState<number | string>('');
+  const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
+
+  // Notification settings
+  const [notifyOrderConfirmation, setNotifyOrderConfirmation] = useState(true);
+  const [notifyShippingUpdate, setNotifyShippingUpdate] = useState(true);
+  const [notifyPasswordReset, setNotifyPasswordReset] = useState(true);
+
 
   const fetchSettings = useCallback(async () => {
     setIsLoadingSettings(true);
@@ -114,6 +130,20 @@ const AdminSettings = () => {
         setMaintenanceMode(settings.maintenanceMode || false);
         setUpiId(settings.paymentGatewayKeys?.upiVpa || '');
         if(settings.paymentGatewayKeys?.upiVpa) localStorage.setItem('storeUpiId', settings.paymentGatewayKeys.upiVpa);
+
+        // Load shipping settings
+        setDefaultShippingRate(settings.shipping?.defaultRate ?? '');
+        setFreeShippingThreshold(settings.shipping?.freeShippingThreshold ?? '');
+
+        // Load tax settings
+        setDefaultTaxRate(settings.tax?.defaultRate ?? '');
+        setPricesIncludeTax(settings.tax?.pricesIncludeTax || false);
+
+        // Load notification settings
+        setNotifyOrderConfirmation(settings.notifications?.orderConfirmation === undefined ? true : settings.notifications.orderConfirmation);
+        setNotifyShippingUpdate(settings.notifications?.shippingUpdate === undefined ? true : settings.notifications.shippingUpdate);
+        setNotifyPasswordReset(settings.notifications?.passwordReset === undefined ? true : settings.notifications.passwordReset);
+
       } else {
         toast.error(result.error || "Failed to load site settings.");
       }
@@ -257,6 +287,75 @@ const AdminSettings = () => {
     setIsSavingUpi(false);
   };
 
+  const handleSaveShippingTaxSettings = async () => {
+    setIsSavingShippingTax(true);
+    const settingsToSave: Partial<SiteSettings> = {
+      shipping: {
+        defaultRate: Number(defaultShippingRate) || 0,
+        freeShippingThreshold: Number(freeShippingThreshold) || 0,
+      },
+      tax: {
+        defaultRate: Number(defaultTaxRate) || 0,
+        pricesIncludeTax: pricesIncludeTax,
+      },
+    };
+    try {
+      const result = updateSiteSettingsFunction
+        ? (await updateSiteSettingsFunction(settingsToSave)).data
+        : await callFallbackMock('admin-updateSiteSettingsCF', settingsToSave);
+      
+      if (result.success) {
+        toast.success("Shipping & Tax settings saved!");
+        if (result.settings) {
+            setDefaultShippingRate(result.settings.shipping?.defaultRate ?? '');
+            setFreeShippingThreshold(result.settings.shipping?.freeShippingThreshold ?? '');
+            setDefaultTaxRate(result.settings.tax?.defaultRate ?? '');
+            setPricesIncludeTax(result.settings.tax?.pricesIncludeTax || false);
+        }
+      } else {
+        toast.error(result.error || "Failed to save Shipping & Tax settings.");
+      }
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error instanceof Error) message = error.message;
+      toast.error(`Failed to save Shipping & Tax settings: ${message}`);
+    }
+    setIsSavingShippingTax(false);
+  };
+
+  const handleSaveNotificationSettings = async () => {
+    setIsSavingNotifications(true);
+    const settingsToSave: Partial<SiteSettings> = {
+      notifications: {
+        orderConfirmation: notifyOrderConfirmation,
+        shippingUpdate: notifyShippingUpdate,
+        passwordReset: notifyPasswordReset,
+      },
+    };
+    try {
+      const result = updateSiteSettingsFunction
+        ? (await updateSiteSettingsFunction(settingsToSave)).data
+        : await callFallbackMock('admin-updateSiteSettingsCF', settingsToSave);
+
+      if (result.success) {
+        toast.success("Notification settings saved!");
+        if (result.settings?.notifications) {
+            setNotifyOrderConfirmation(result.settings.notifications.orderConfirmation === undefined ? true : result.settings.notifications.orderConfirmation);
+            setNotifyShippingUpdate(result.settings.notifications.shippingUpdate === undefined ? true : result.settings.notifications.shippingUpdate);
+            setNotifyPasswordReset(result.settings.notifications.passwordReset === undefined ? true : result.settings.notifications.passwordReset);
+        }
+      } else {
+        toast.error(result.error || "Failed to save Notification settings.");
+      }
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error instanceof Error) message = error.message;
+      toast.error(`Failed to save Notification settings: ${message}`);
+    }
+    setIsSavingNotifications(false);
+  };
+
+
   if (isLoadingSettings) return <AdminLayout><div className="p-6 text-center"><Loader2 className="h-6 w-6 animate-spin inline mr-2" />Loading settings...</div></AdminLayout>;
 
   return (
@@ -264,14 +363,16 @@ const AdminSettings = () => {
       <div className="p-6">
         <h1 className="text-3xl font-bold mb-6">Settings</h1>
         <Tabs defaultValue="general">
-          <TabsList className="mb-6 grid w-full grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
+          <TabsList className="mb-6 grid w-full grid-cols-3 md:grid-cols-5 lg:grid-cols-7"> {/* Adjusted grid-cols for more tabs */}
             <TabsTrigger value="general"><Settings className="h-4 w-4 mr-2 inline" />General</TabsTrigger>
             <TabsTrigger value="payments"><CreditCard className="h-4 w-4 mr-2 inline" />Payments</TabsTrigger>
             <TabsTrigger value="store"><ShoppingBag className="h-4 w-4 mr-2 inline" />Store Info</TabsTrigger>
+            <TabsTrigger value="shipping_tax"><Truck className="h-4 w-4 mr-2 inline" />Shipping & Tax</TabsTrigger>
+            <TabsTrigger value="notifications"><Mail className="h-4 w-4 mr-2 inline" />Notifications</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <Card>
-              <CardHeader><CardTitle>General Settings</CardTitle><CardDescription>Manage your store's general settings.</CardDescription></CardHeader>
+              <CardHeader><CardTitle>General Settings</CardTitle><CardDescription>Manage your store's general information and theme.</CardDescription></CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2"><Label htmlFor="store-name">Store Name</Label><Input id="store-name" value={storeName} onChange={e => setStoreName(e.target.value)} /></div>
                 <div className="space-y-2"><Label htmlFor="store-logo-url">Store Logo URL</Label><Input id="store-logo-url" type="url" placeholder="https://example.com/logo.png" value={storeLogoUrl} onChange={e => setStoreLogoUrl(e.target.value)} /></div>
@@ -367,6 +468,21 @@ const AdminSettings = () => {
                   <Label htmlFor="default-meta-description">Default Meta Description</Label>
                   <Textarea id="default-meta-description" placeholder="Discover amazing products at the best prices..." value={defaultMetaDescription} onChange={e => setDefaultMetaDescription(e.target.value)} />
                 </div>
+
+                {/* Sitemap Generation Button */}
+                <div className="pt-4 border-t">
+                  <Label htmlFor="sitemap-generation" className="block text-sm font-medium text-gray-700 mb-1">Sitemap</Label>
+                  <Button 
+                    id="sitemap-generation"
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => toast.info('Sitemap generation initiated (demo)')}
+                  >
+                    Generate Sitemap
+                  </Button>
+                  <p className="text-xs text-gray-500 mt-1">Click to generate/regenerate the sitemap.xml file for your store.</p>
+                </div>
+
                 <h4 className="text-md font-medium pt-4 border-t">Tracking IDs</h4>
                 <div className="space-y-2">
                   <Label htmlFor="google-analytics-id">Google Analytics ID</Label>
@@ -377,6 +493,61 @@ const AdminSettings = () => {
                   <Input id="facebook-pixel-id" placeholder="Your Facebook Pixel ID" value={facebookPixelId} onChange={e => setFacebookPixelId(e.target.value)} />
                 </div>
                 <Button onClick={handleSaveStoreInfoSettings} disabled={isSavingStoreInfo}>{isSavingStoreInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Save Store Info</Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="shipping_tax">
+            <Card>
+              <CardHeader><CardTitle>Shipping & Tax Settings</CardTitle><CardDescription>Configure shipping rates and tax options.</CardDescription></CardHeader>
+              <CardContent className="space-y-6">
+                <h4 className="text-md font-medium">Shipping Configuration</h4>
+                <div className="space-y-2">
+                  <Label htmlFor="default-shipping-rate">Default Shipping Rate</Label>
+                  <Input id="default-shipping-rate" type="number" placeholder="e.g., 5.00" value={defaultShippingRate} onChange={e => setDefaultShippingRate(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="free-shipping-threshold">Free Shipping Threshold</Label>
+                  <Input id="free-shipping-threshold" type="number" placeholder="e.g., 50.00 (0 to disable)" value={freeShippingThreshold} onChange={e => setFreeShippingThreshold(e.target.value)} />
+                </div>
+                <h4 className="text-md font-medium pt-4 border-t">Tax Configuration</h4>
+                <div className="space-y-2">
+                  <Label htmlFor="default-tax-rate">Default Tax Rate (%)</Label>
+                  <Input id="default-tax-rate" type="number" placeholder="e.g., 7.5" value={defaultTaxRate} onChange={e => setDefaultTaxRate(e.target.value)} />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="prices-include-tax" checked={pricesIncludeTax} onCheckedChange={setPricesIncludeTax} />
+                  <Label htmlFor="prices-include-tax">Prices entered with tax included?</Label>
+                </div>
+                <Button onClick={handleSaveShippingTaxSettings} disabled={isSavingShippingTax}>{isSavingShippingTax ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Save Shipping & Tax Settings</Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="notifications">
+            <Card>
+              <CardHeader><CardTitle>Email Notification Settings</CardTitle><CardDescription>Manage automated customer email notifications.</CardDescription></CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="notify-order-confirmation">Order Confirmation Email</Label>
+                    <div className="text-sm text-gray-500">Send an email to the customer when an order is successfully placed.</div>
+                  </div>
+                  <Switch id="notify-order-confirmation" checked={notifyOrderConfirmation} onCheckedChange={setNotifyOrderConfirmation} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="notify-shipping-update">Shipping Update Email</Label>
+                    <div className="text-sm text-gray-500">Notify customer when their order has been shipped.</div>
+                  </div>
+                  <Switch id="notify-shipping-update" checked={notifyShippingUpdate} onCheckedChange={setNotifyShippingUpdate} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="notify-password-reset">Password Reset Email</Label>
+                    <div className="text-sm text-gray-500">Allow users to reset their password via email.</div>
+                  </div>
+                  <Switch id="notify-password-reset" checked={notifyPasswordReset} onCheckedChange={setNotifyPasswordReset} />
+                </div>
+                <Button onClick={handleSaveNotificationSettings} disabled={isSavingNotifications}>{isSavingNotifications ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Save Notification Settings</Button>
               </CardContent>
             </Card>
           </TabsContent>

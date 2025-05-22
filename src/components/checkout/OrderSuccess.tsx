@@ -74,7 +74,10 @@ const OrderSuccess: React.FC<OrderSuccessProps> = ({ orderDetails, deliveryDetai
       
       <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-4 justify-center">
         <Button variant="outline" onClick={() => navigate('/')}>Continue Shopping</Button>
-        {/* <Button className="bg-brand-teal hover:bg-brand-dark" onClick={() => navigate('/account/orders')}>View My Orders</Button> */}
+        <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={() => navigate(`/order-tracking/${orderDetails.id}`)}>
+          Track Your Order
+        </Button>
+        {/* <Button className="bg-brand-teal hover:bg-brand-dark" onClick={() => navigate('/account/orders')}>View All My Orders</Button> */}
       </div>
     </div>
   );

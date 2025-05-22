@@ -5,10 +5,13 @@ import {
   User, 
   Search, 
   Menu,
-  X
+  X,
+  // Search as SearchIcon, // Renamed to avoid conflict if SearchBar is also named Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+// import { Input } from '@/components/ui/input'; // Will be replaced by SearchBar
+import SearchBar from './SearchBar'; // Import SearchBar
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -20,9 +23,18 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 export const Header = () => {
   const { user } = useAuth();
   const { cart } = useCart();
+  const navigate = useNavigate(); // Initialize useNavigate
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const cartItemsCount = cart?.length || 0;
+
+  const staticSuggestions = ["Laptop", "Smartphone", "Headphones", "Wireless Mouse", "Keyboard", "Webcam", "Monitor"];
+
+  const handleSearch = (query: string) => {
+    if (query.trim()) {
+      navigate(`/products?search=${encodeURIComponent(query.trim())}`);
+    }
+  };
   
   const mainNavItems = [
     { name: 'Home', path: '/' },
@@ -131,14 +143,9 @@ export const Header = () => {
         
         {/* Search, User, Cart, Currency Controls */}
         <div className="flex items-center space-x-3">
-          {/* Search */}
-          <div className="hidden md:flex relative items-center">
-            <Input
-              type="search"
-              placeholder="Search..."
-              className="w-[200px] lg:w-[300px] pl-8"
-            />
-            <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" />
+          {/* SearchBar Component */}
+          <div className="hidden md:block w-[200px] lg:w-[300px]">
+            <SearchBar onSearch={handleSearch} suggestions={staticSuggestions} />
           </div>
           
           {/* Currency Selector (Desktop) */}

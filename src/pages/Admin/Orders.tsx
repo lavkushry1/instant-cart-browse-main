@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { Search, Filter, Edit, Trash2, Eye, ArrowUpDown, X, FileText, Loader2, ShoppingBag } from 'lucide-react'; // Added ShoppingBag
+import { Search, Filter, Edit, Trash2, Eye, ArrowUpDown, X, FileText, Loader2, ShoppingBag, Printer, StickyNote } from 'lucide-react'; // Added Printer, StickyNote
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea'; // Added Textarea for notes
+import { Label } from '@/components/ui/label'; // Added Label for notes
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -71,6 +73,7 @@ const AdminOrders = () => {
   const [orderToUpdate, setOrderToUpdate] = useState<Order | null>(null);
   const [newStatus, setNewStatus] = useState<OrderStatus>('Processing');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [internalNote, setInternalNote] = useState(''); // State for new internal note
 
 
   const fetchOrders = useCallback(async () => {
@@ -175,8 +178,130 @@ const AdminOrders = () => {
             <DialogFooter className="mt-4"><Button variant="outline" onClick={()=>setDialogsOpen(p=>({...p,statusUpdate:false}))}>Cancel</Button><Button onClick={handleStatusUpdateConfirm}>Update</Button></DialogFooter>
           </DialogContent>
         </Dialog>
-        <Dialog open={dialogsOpen.details} onOpenChange={(isOpen) => setDialogsOpen(p => ({...p, details: isOpen}))}>
-          <DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Order #{selectedOrder?.id.substring(0,8)}</DialogTitle></DialogHeader>{selectedOrder && <pre className="text-xs overflow-auto p-2 bg-gray-50 rounded max-h-[60vh]">{JSON.stringify(selectedOrder, null, 2)}</pre>}</DialogContent>
+        <Dialog open={dialogsOpen.details} onOpenChange={(isOpen) => { setDialogsOpen(p => ({...p, details: isOpen})); if (!isOpen) setInternalNote(''); }}>
+          <DialogContent className="max-w-3xl"> {/* Increased width for better layout */}
+            <DialogHeader>
+              <DialogTitle>Order Details - #{selectedOrder?.id.substring(0,8)}...</DialogTitle>
+              <DialogDescription>
+                Date: {selectedOrder ? formatDate(selectedOrder.createdAt) : 'N/A'} | Status: {selectedOrder ? selectedOrder.orderStatus : 'N/A'}
+              </DialogDescription>
+            </DialogHeader>
+            {selectedOrder && (
+              <div className="space-y-6 max-h-[70vh] overflow-y-auto p-1 pr-3"> {/* Added padding and scroll */}
+                {/* Customer and Shipping Info */}
+                <Card>
+                  <CardHeader><CardTitle className="text-lg">Customer & Shipping</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p><strong>Customer:</strong> {(selectedOrder as any).customerName || selectedOrder.customerEmail}</p>
+                      <p><strong>Email:</strong> {selectedOrder.customerEmail}</p>
+                    </div>
+                    <div>
+                      <p><strong>Shipping Address:</strong></p>
+                      <address className="not-italic">
+                        {selectedOrder.shippingAddress.firstName} {selectedOrder.shippingAddress.lastName}<br />
+                        {selectedOrder.shippingAddress.address}<br />
+                        {selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.state} {selectedOrder.shippingAddress.zipCode}<br />
+                        {selectedOrder.shippingAddress.country || 'N/A'}
+                      </address>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Order Items */}
+                <Card>
+                  <CardHeader><CardTitle className="text-lg">Order Items ({selectedOrder.items.length})</CardTitle></CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-center">Qty</TableHead>
+                          <TableHead className="text-right">Price</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedOrder.items.map(item => (
+                          <TableRow key={item.productId}>
+                            <TableCell>{item.productName}</TableCell>
+                            <TableCell className="text-center">{item.quantity}</TableCell>
+                            <TableCell className="text-right">₹{item.finalUnitPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">₹{item.lineItemTotal.toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    <div className="text-right font-bold mt-2">Grand Total: ₹{selectedOrder.grandTotal.toFixed(2)}</div>
+                  </CardContent>
+                </Card>
+
+                {/* Internal Order Notes */}
+                <Card>
+                  <CardHeader><CardTitle className="text-lg flex items-center"><StickyNote className="mr-2 h-5 w-5" />Internal Order Notes</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-md">
+                      {/* Placeholder for existing notes - In a real app, these would be fetched and mapped */}
+                      <p>No notes yet.</p>
+                      {/* Example of how notes might look:
+                      <div className="border-b pb-2 mb-2">
+                        <p className="font-medium">Admin User A - 2024-05-20 10:30 AM</p>
+                        <p>Customer called to confirm shipping address.</p>
+                      </div>
+                      */}
+                    </div>
+                    <div>
+                      <Label htmlFor="internal-note" className="sr-only">Add New Note</Label>
+                      <Textarea 
+                        id="internal-note"
+                        placeholder="Add an internal note for this order (e.g., special handling instructions, customer communication log)..." 
+                        value={internalNote}
+                        onChange={(e) => setInternalNote(e.target.value)}
+                        className="min-h-[80px]"
+                      />
+                    </div>
+                    <Button 
+                      size="sm"
+                      onClick={() => {
+                        if (internalNote.trim()) {
+                          toast.success('Note saved (demo)');
+                          // In a real app, you would save the note here.
+                          // For demo, we could add it to a local state if we wanted to show it immediately above.
+                          setInternalNote(''); // Clear textarea after "saving"
+                        } else {
+                          toast.error('Note cannot be empty.');
+                        }
+                      }}
+                    >
+                      <StickyNote className="mr-2 h-4 w-4" /> Save Note
+                    </Button>
+                  </CardContent>
+                </Card>
+                
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => toast.info('Printing invoice (demo)...')}
+                    className="flex-1"
+                  >
+                    <Printer className="mr-2 h-4 w-4" /> Print Invoice
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => toast.info('Printing packing slip (demo)...')}
+                    className="flex-1"
+                  >
+                    <FileText className="mr-2 h-4 w-4" /> Print Packing Slip
+                  </Button>
+                </div>
+
+              </div>
+            )}
+            <DialogFooter className="mt-2">
+              <Button variant="outline" onClick={() => setDialogsOpen(p => ({...p, details: false}))}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
         </Dialog>
       </div>
     </AdminLayout>

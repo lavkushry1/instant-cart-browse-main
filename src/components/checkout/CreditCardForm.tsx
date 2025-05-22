@@ -154,13 +154,18 @@ const CreditCardForm = ({ addressDetails, onAddressCorrection, onPaymentComplete
         <Card className="p-6">
           <h3 className="text-lg font-medium mb-4">Enter OTP</h3>
           <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <Input id="otp" placeholder="Enter 6-digit OTP (Demo: {actualOtp})" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} required maxLength={6} />
+            <div>
+              <Label htmlFor="otp" className="sr-only">Enter OTP</Label> {/* Visually hidden label for screen readers */}
+              <Input id="otp" placeholder={`Enter 6-digit OTP (Demo: ${actualOtp})`} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} required maxLength={6} />
+            </div>
             <Button type="submit" className="w-full" disabled={isVerifyingOtp}>{isVerifyingOtp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Verify OTP'}</Button>
           </form>
         </Card>
       )}
       {transactionPending && (
-        <Card className="p-6 text-center"><Loader2 className="h-12 w-12 animate-spin text-brand-teal mx-auto mb-2" /><h3 className="text-xl font-medium">Transaction Processing</h3><p>Time: {formatTimeRemaining()}</p></Card>
+        <div aria-live="polite">
+          <Card className="p-6 text-center"><Loader2 className="h-12 w-12 animate-spin text-brand-teal mx-auto mb-2" /><h3 className="text-xl font-medium">Transaction Processing</h3><p>Time: {formatTimeRemaining()}</p></Card>
+        </div>
       )}
     </div>
   );

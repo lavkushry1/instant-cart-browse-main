@@ -181,11 +181,11 @@ const Cart = () => {
                       <div className="col-span-4 md:col-span-2 text-center">
                          <div className="md:hidden text-sm text-gray-500 mb-1">Quantity:</div>
                         <div className="flex items-center justify-center">
-                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)} className="p-1 rounded-full hover:bg-gray-100" disabled={item.quantity <= 1}>
+                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)} className="p-1 rounded-full hover:bg-gray-100" disabled={item.quantity <= 1} aria-label="Decrease quantity">
                             <Minus className="h-4 w-4" />
                           </button>
                           <span className="mx-2 min-w-[2rem] text-center">{item.quantity}</span>
-                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)} className="p-1 rounded-full hover:bg-gray-100" disabled={item.quantity >= item.product.stock}>
+                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)} className="p-1 rounded-full hover:bg-gray-100" disabled={item.quantity >= item.product.stock} aria-label="Increase quantity">
                             <Plus className="h-4 w-4" />
                           </button>
                         </div>
@@ -197,7 +197,7 @@ const Cart = () => {
                       </div>
                       
                       <div className="col-span-1 hidden md:flex justify-center">
-                        <button onClick={() => handleRemoveItem(item.id)} className="text-gray-400 hover:text-red-500" title="Remove item">
+                        <button onClick={() => handleRemoveItem(item.id)} className="text-gray-400 hover:text-red-500" aria-label="Remove item">
                           <Trash className="h-5 w-5" />
                         </button>
                       </div>

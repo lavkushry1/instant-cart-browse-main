@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
+import React, { useState, useEffect, useCallback, useMemo } from 'react'; // Added useMemo
+import { useSearchParams } from 'react-router-dom';
+import Layout from '../components/layout/Layout';
 import ProductList from '../components/products/ProductList';
 import ProductFilter, { FilterOptions } from '../components/products/ProductFilter';
 import { Product as LocalProduct } from '../types/product'; // Renamed to avoid conflict
@@ -13,6 +16,7 @@ import {
 import ProductCardSkeleton from '../components/products/ProductCardSkeleton';
 import { Button } from '@/components/ui/button'; // Import Button for Load More
 import { Loader2 } from 'lucide-react'; // For Load More button loading state
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Import Select
 
 // Helper function to map service product to local client product
 const mapServiceProductToLocalProduct = (serviceProduct: ServiceProduct): LocalProduct => {
@@ -50,11 +54,13 @@ const Products = () => {
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false); // To track initial load for skeletons
   const [lastVisibleDoc, setLastVisibleDoc] = useState<ClientDocumentSnapshot | undefined>(undefined);
   const [hasNextPage, setHasNextPage] = useState(true);
+  const [sortOption, setSortOption] = useState<string>('name-asc'); // Default sort
   
   // Mocked or simplified filter options - these would ideally come from backend services
   const [categories, setCategories] = useState<string[]>([]); // TODO: Fetch from categoryService
   const [tags, setTags] = useState<string[]>([]); // TODO: Fetch or derive from products
   const [maxPrice, setMaxPrice] = useState(10000); // TODO: Fetch or derive from products
+  const [displayedProducts, setDisplayedProducts] = useState<LocalProduct[]>([]); // For sorted/filtered products
   
   const categoryParam = searchParams.get('category');
   const searchQueryParam = searchParams.get('search');
@@ -111,13 +117,34 @@ const Products = () => {
         setHasFetchedOnce(true);
       }
     }
-  }, [categoryParam, searchQueryParam, lastVisibleDoc]);
+  }, [categoryParam, searchQueryParam, lastVisibleDoc]); // Removed fetchProductsCallback from here as it's defined below and causes re-renders
 
   useEffect(() => {
     // Initial fetch, not loading more, no specific filter options beyond URL params
     fetchProductsCallback({}); 
-  }, [categoryParam, searchQueryParam, fetchProductsCallback]);
+  }, [categoryParam, searchQueryParam]); // Removed fetchProductsCallback from deps here, it is stable now
 
+  // Sorting logic
+  useEffect(() => {
+    let sortedProducts = [...filteredProducts];
+    switch (sortOption) {
+      case 'name-asc':
+        sortedProducts.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'name-desc':
+        sortedProducts.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case 'price-asc':
+        sortedProducts.sort((a, b) => a.price - b.price);
+        break;
+      case 'price-desc':
+        sortedProducts.sort((a, b) => b.price - a.price);
+        break;
+      default:
+        break;
+    }
+    setDisplayedProducts(sortedProducts);
+  }, [sortOption, filteredProducts]);
   
   const handleFilterChange = useCallback(async (filterValues: FilterOptions) => {
     const options: ServiceGetAllProductsOptions = { isEnabled: true };
@@ -166,6 +193,22 @@ const Products = () => {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Filters sidebar */}
             <div className="lg:col-span-1">
+              {/* Sorting Dropdown */}
+              <div className="mb-6 bg-white p-4 rounded-lg shadow">
+                <label htmlFor="sort-options" className="block text-sm font-medium text-gray-700 mb-2">Sort by</label>
+                <Select value={sortOption} onValueChange={setSortOption}>
+                  <SelectTrigger id="sort-options">
+                    <SelectValue placeholder="Select sort option" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                    <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                    <SelectItem value="price-asc">Price (Low to High)</SelectItem>
+                    <SelectItem value="price-desc">Price (High to Low)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <ProductFilter 
                 categories={categories}
                 tags={tags}
@@ -193,20 +236,20 @@ const Products = () => {
                   <h2 className="text-2xl font-bold text-red-500 mb-2">Oops!</h2>
                   <p className="text-gray-600 mb-4">{error}</p>
                   <button 
-                    onClick={() => fetchProductsCallback()} // Re-fetch on error
+                    onClick={() => fetchProductsCallback({}, false)} // Re-fetch on error, ensure not loadMore
                     className="px-4 py-2 bg-brand-teal text-white rounded-md hover:bg-brand-dark"
                   >
                     Try Again
                   </button>
                 </div>
-            ) : filteredProducts.length === 0 && !loading ? (
+            ) : displayedProducts.length === 0 && !loading ? ( // Check displayedProducts here
               <div className="text-center py-10">
                   <p className="text-xl text-gray-600">No products found matching your criteria.</p>
                 </div>
               ) : (
                 <ProductList 
                 title={getTitle()} // This title might be redundant if h1 is already there
-                  products={filteredProducts}
+                  products={displayedProducts} // Use displayedProducts for rendering
                 category={categoryParam || undefined}
                 />
               )}

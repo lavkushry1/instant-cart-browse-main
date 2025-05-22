@@ -12,7 +12,8 @@ import {
   LogOut,
   Code,
   LineChart,
-  Banknote
+  Banknote,
+  MessageSquare // Icon for Reviews
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,6 +50,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     { name: 'SEO', icon: <Globe className="h-5 w-5" />, path: '/admin/seo' },
     { name: 'Theme', icon: <PaintBucket className="h-5 w-5" />, path: '/admin/theme' },
     { name: 'Tracking', icon: <Code className="h-5 w-5" />, path: '/admin/tracking' },
+    { name: 'Reviews', icon: <MessageSquare className="h-5 w-5" />, path: '/admin/reviews' },
     { name: 'Settings', icon: <Settings className="h-5 w-5" />, path: '/admin/settings' },
   ];
 
