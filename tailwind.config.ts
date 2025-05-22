@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
 
@@ -18,6 +17,9 @@ export default {
 			screens: {
 				'2xl': '1400px'
 			}
+		},
+		fontFamily: {
+			sans: ['Roboto', 'Inter', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
 		},
 		extend: {
 			colors: {
@@ -71,6 +73,20 @@ export default {
 					black: '#111827',
 					gray: '#9ca3af',
 					lightGray: '#f3f4f6'
+				},
+				flipkart: {
+					blue: '#2874F0',         // Flipkart Primary Blue
+					orange: '#FB641B',       // Secondary Orange (Buy Now buttons)
+					yellow: '#FFE500',       // Accent Yellow
+					green: '#388E3C',        // Success Green
+					red: '#ff6161',          // Error Red
+					dark: '#172337',         // Dark Blue (Footer background)
+					gray: {
+						background: '#f1f3f6',   // Main background color
+						border: '#e0e0e0',       // Border color
+						'secondary-text': '#878787', // Secondary text
+						'primary-text': '#212121',   // Primary text (never pure black)
+					}
 				}
 			},
 			borderRadius: {
@@ -115,6 +131,20 @@ export default {
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'fade-in': 'fade-in 0.3s ease-out',
 				'slide-in-right': 'slide-in-right 0.3s ease-out'
+			},
+			fontSize: {
+				// Flipkart Typography System (matching PRD 3.2)
+				'flipkart-header-sm': ['16px', { lineHeight: '1.2', fontWeight: '500' }],
+				'flipkart-header-md': ['18px', { lineHeight: '1.2', fontWeight: '500' }],
+				'flipkart-header-lg': ['20px', { lineHeight: '1.2', fontWeight: '500' }],
+				'flipkart-body': ['14px', { lineHeight: '1.4', fontWeight: '400' }],
+				'flipkart-small': ['12px', { lineHeight: '1.4', fontWeight: '400' }],
+				'flipkart-price-discounted': ['16px', { lineHeight: '1.2', fontWeight: '700' }],
+				'flipkart-price-original': ['14px', { lineHeight: '1.2', fontWeight: '400' }],
+				'flipkart-button': ['14px', { lineHeight: '1.2', fontWeight: '500' }],
+			},
+			boxShadow: {
+				'flipkart-card': '0 2px 16px rgba(0,0,0,0.1)',
 			}
 		}
 	},

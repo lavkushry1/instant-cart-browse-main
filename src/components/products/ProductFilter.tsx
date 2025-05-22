@@ -1,14 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { CheckedState } from '@radix-ui/react-checkbox';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, ChevronDown } from 'lucide-react';
 
 interface ProductFilterProps {
   categories: string[];
@@ -25,6 +22,36 @@ export interface FilterOptions {
   inStock: boolean;
   onSale: boolean;
 }
+
+// Brands mock data for Flipkart-style filters
+const mockBrands = [
+  "Apple", "Samsung", "OnePlus", "Dell", "HP", "Adidas", "Nike", 
+  "Puma", "Levi's", "Zara", "H&M", "Titan", "Fossil", "Sony"
+];
+
+// Customer ratings mock data for Flipkart-style filters
+const customerRatings = [
+  { value: '4', label: '4★ & above' },
+  { value: '3', label: '3★ & above' },
+  { value: '2', label: '2★ & above' },
+  { value: '1', label: '1★ & above' }
+];
+
+// Availability options
+const availabilityOptions = [
+  { value: 'instock', label: 'Exclude Out of Stock' },
+];
+
+// Discount options
+const discountOptions = [
+  { value: '10', label: '10% or more' },
+  { value: '20', label: '20% or more' },
+  { value: '30', label: '30% or more' },
+  { value: '40', label: '40% or more' },
+  { value: '50', label: '50% or more' },
+  { value: '60', label: '60% or more' },
+  { value: '70', label: '70% or more' },
+];
 
 const ProductFilter = ({ 
   categories, 
@@ -45,6 +72,7 @@ const ProductFilter = ({
   });
   
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
+  const [showMoreBrands, setShowMoreBrands] = useState(false);
   
   // Update active filters count whenever filters change
   useEffect(() => {
@@ -83,10 +111,10 @@ const ProductFilter = ({
     }));
   };
   
-  const handlePriceRangeChange = (value: [number, number]) => {
+  const handlePriceRangeChange = (value: number[]) => {
     setFilters(prev => ({
       ...prev,
-      priceRange: value
+      priceRange: [value[0], value[1]] as [number, number]
     }));
   };
   
@@ -152,189 +180,200 @@ const ProductFilter = ({
   };
   
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-4">
-        {/* Active Filters */}
-        {activeFiltersCount > 0 && (
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-sm font-medium">Active Filters</h3>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 text-xs"
-                onClick={clearAllFilters}
-              >
-                Clear All
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {filters.categories.map(category => (
-                <Badge key={`cat-${category}`} variant="outline" className="flex items-center gap-1">
+    <div className="overflow-hidden bg-white">
+      {/* Filters Title */}
+      <div className="p-4 border-b border-flipkart-gray-border">
+        <div className="flex justify-between items-center">
+          <h2 className="text-flipkart-header-sm text-flipkart-gray-primary-text">Filters</h2>
+          {activeFiltersCount > 0 && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 text-xs text-flipkart-blue hover:bg-transparent hover:text-blue-600"
+              onClick={clearAllFilters}
+            >
+              CLEAR ALL
+            </Button>
+          )}
+        </div>
+      </div>
+      
+      <div className="divide-y divide-flipkart-gray-border">
+        {/* Categories Section */}
+        <div className="p-4">
+          <h3 className="text-flipkart-body font-medium mb-3">CATEGORIES</h3>
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            {categories.map(category => (
+              <div key={category} className="flex items-center space-x-2">
+                <Checkbox 
+                  id={`category-${category}`} 
+                  checked={filters.categories.includes(category)}
+                  onCheckedChange={(checked: CheckedState) => handleCategoryChange(category, checked)}
+                  className="text-flipkart-blue border-flipkart-gray-border"
+                />
+                <Label 
+                  htmlFor={`category-${category}`}
+                  className="text-flipkart-body cursor-pointer text-flipkart-gray-primary-text"
+                >
                   {category}
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
-                    onClick={() => removeFilter('category', category)}
-                  />
-                </Badge>
-              ))}
-              
-              {filters.tags.map(tag => (
-                <Badge key={`tag-${tag}`} variant="outline" className="flex items-center gap-1">
-                  #{tag}
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
-                    onClick={() => removeFilter('tag', tag)}
-                  />
-                </Badge>
-              ))}
-              
-              {(filters.priceRange[0] > 0 || filters.priceRange[1] < maxPrice) && (
-                <Badge variant="outline" className="flex items-center gap-1">
-                  ₹{filters.priceRange[0]} - ₹{filters.priceRange[1]}
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
-                    onClick={() => removeFilter('price')}
-                  />
-                </Badge>
-              )}
-              
-              {filters.inStock && (
-                <Badge variant="outline" className="flex items-center gap-1">
-                  In Stock
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
-                    onClick={() => removeFilter('stock')}
-                  />
-                </Badge>
-              )}
-              
-              {filters.onSale && (
-                <Badge variant="outline" className="flex items-center gap-1">
-                  On Sale
-                  <X 
-                    className="h-3 w-3 cursor-pointer" 
-                    onClick={() => removeFilter('sale')}
-                  />
-                </Badge>
-              )}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Price Range */}
+        <div className="p-4">
+          <h3 className="text-flipkart-body font-medium mb-4">PRICE</h3>
+          <Slider
+            className="mb-6"
+            value={[filters.priceRange[0], filters.priceRange[1]]}
+            min={0}
+            max={maxPrice}
+            step={100}
+            onValueChange={handlePriceRangeChange}
+          />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center border border-flipkart-gray-border rounded p-1 text-sm">
+              <span className="text-gray-400 mr-1">₹</span>
+              <input 
+                type="number" 
+                className="w-14 outline-none text-sm" 
+                value={filters.priceRange[0]}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  priceRange: [parseInt(e.target.value) || 0, prev.priceRange[1]] 
+                }))}
+                min={0}
+              />
+            </div>
+            <span className="text-gray-400">to</span>
+            <div className="flex items-center border border-flipkart-gray-border rounded p-1 text-sm">
+              <span className="text-gray-400 mr-1">₹</span>
+              <input 
+                type="number" 
+                className="w-14 outline-none text-sm" 
+                value={filters.priceRange[1]}
+                onChange={(e) => setFilters(prev => ({ 
+                  ...prev, 
+                  priceRange: [prev.priceRange[0], parseInt(e.target.value) || maxPrice] 
+                }))}
+                max={maxPrice}
+              />
             </div>
           </div>
-        )}
+        </div>
         
-        {/* Filter Accordion */}
-        <Accordion type="multiple" defaultValue={["categories", "price"]}>
-          {/* Categories */}
-          <AccordionItem value="categories">
-            <AccordionTrigger className="text-sm font-medium">Categories</AccordionTrigger>
-            <AccordionContent>
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                {categories.map(category => (
-                  <div key={category} className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={`category-${category}`} 
-                      checked={filters.categories.includes(category)}
-                      onCheckedChange={(checked: CheckedState) => handleCategoryChange(category, checked)}
-                    />
-                    <Label 
-                      htmlFor={`category-${category}`}
-                      className="text-sm cursor-pointer"
-                    >
-                      {category}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-          
-          {/* Price Range */}
-          <AccordionItem value="price">
-            <AccordionTrigger className="text-sm font-medium">Price Range</AccordionTrigger>
-            <AccordionContent>
-              <div className="px-2 py-4">
-                <Slider
-                  value={filters.priceRange}
-                  min={0}
-                  max={maxPrice}
-                  step={100}
-                  onValueChange={(value: number[]) => {
-                    if (Array.isArray(value) && value.length === 2) {
-                      handlePriceRangeChange(value as [number, number]);
-                    }
-                  }}
-                />
-                <div className="flex justify-between mt-2 text-sm">
-                  <span>₹{filters.priceRange[0]}</span>
-                  <span>₹{filters.priceRange[1]}</span>
+        {/* Brand Section */}
+        <div className="p-4">
+          <h3 className="text-flipkart-body font-medium mb-3">BRAND</h3>
+          <div className="relative">
+            <input 
+              type="text"
+              placeholder="Search Brand"
+              className="border border-flipkart-gray-border rounded w-full p-2 mb-3 text-sm"
+            />
+          </div>
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            {mockBrands
+              .slice(0, showMoreBrands ? mockBrands.length : 6)
+              .map(brand => (
+                <div key={brand} className="flex items-center space-x-2">
+                  <Checkbox 
+                    id={`brand-${brand}`}
+                    className="text-flipkart-blue border-flipkart-gray-border"
+                  />
+                  <Label 
+                    htmlFor={`brand-${brand}`}
+                    className="text-flipkart-body cursor-pointer text-flipkart-gray-primary-text"
+                  >
+                    {brand}
+                  </Label>
                 </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-          
-          {/* Tags */}
-          {tags.length > 0 && (
-            <AccordionItem value="tags">
-              <AccordionTrigger className="text-sm font-medium">Tags</AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                  {tags.map(tag => (
-                    <div key={tag} className="flex items-center space-x-2">
-                      <Checkbox 
-                        id={`tag-${tag}`} 
-                        checked={filters.tags.includes(tag)}
-                        onCheckedChange={(checked: CheckedState) => handleTagChange(tag, checked)}
-                      />
-                      <Label 
-                        htmlFor={`tag-${tag}`}
-                        className="text-sm cursor-pointer"
-                      >
-                        #{tag}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
+              ))
+            }
+          </div>
+          {mockBrands.length > 6 && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="mt-2 h-7 text-xs text-flipkart-blue hover:bg-transparent hover:text-blue-600 p-0"
+              onClick={() => setShowMoreBrands(!showMoreBrands)}
+            >
+              {showMoreBrands ? 'Show Less' : 'Show More'}
+              <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${showMoreBrands ? 'rotate-180' : ''}`} />
+            </Button>
           )}
-          
-          {/* Availability */}
-          <AccordionItem value="availability">
-            <AccordionTrigger className="text-sm font-medium">Availability</AccordionTrigger>
-            <AccordionContent>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="in-stock" 
-                    checked={filters.inStock}
-                    onCheckedChange={handleInStockChange}
-                  />
-                  <Label 
-                    htmlFor="in-stock"
-                    className="text-sm cursor-pointer"
-                  >
-                    In Stock Only
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="on-sale" 
-                    checked={filters.onSale}
-                    onCheckedChange={handleOnSaleChange}
-                  />
-                  <Label 
-                    htmlFor="on-sale"
-                    className="text-sm cursor-pointer"
-                  >
-                    On Sale
-                  </Label>
-                </div>
+        </div>
+        
+        {/* Customer Ratings */}
+        <div className="p-4">
+          <h3 className="text-flipkart-body font-medium mb-3">CUSTOMER RATINGS</h3>
+          <div className="space-y-2">
+            {customerRatings.map(rating => (
+              <div key={rating.value} className="flex items-center space-x-2">
+                <Checkbox 
+                  id={`rating-${rating.value}`}
+                  className="text-flipkart-blue border-flipkart-gray-border"
+                />
+                <Label 
+                  htmlFor={`rating-${rating.value}`}
+                  className="text-flipkart-body cursor-pointer text-flipkart-gray-primary-text"
+                >
+                  {rating.label}
+                </Label>
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </CardContent>
-    </Card>
+            ))}
+          </div>
+        </div>
+        
+        {/* Availability Options */}
+        <div className="p-4">
+          <h3 className="text-flipkart-body font-medium mb-3">AVAILABILITY</h3>
+          <div className="space-y-2">
+            {availabilityOptions.map(option => (
+              <div key={option.value} className="flex items-center space-x-2">
+                <Checkbox 
+                  id={`availability-${option.value}`}
+                  className="text-flipkart-blue border-flipkart-gray-border"
+                  checked={filters.inStock}
+                  onCheckedChange={handleInStockChange}
+                />
+                <Label 
+                  htmlFor={`availability-${option.value}`}
+                  className="text-flipkart-body cursor-pointer text-flipkart-gray-primary-text"
+                >
+                  {option.label}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Discount */}
+        <div className="p-4">
+          <h3 className="text-flipkart-body font-medium mb-3">DISCOUNT</h3>
+          <div className="space-y-2">
+            {discountOptions.map(discount => (
+              <div key={discount.value} className="flex items-center space-x-2">
+                <Checkbox 
+                  id={`discount-${discount.value}`}
+                  className="text-flipkart-blue border-flipkart-gray-border"
+                  checked={filters.onSale && parseInt(discount.value) === 10} // Just for the demo
+                  onCheckedChange={discount.value === "10" ? handleOnSaleChange : undefined}
+                />
+                <Label 
+                  htmlFor={`discount-${discount.value}`}
+                  className="text-flipkart-body cursor-pointer text-flipkart-gray-primary-text"
+                >
+                  {discount.label}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

@@ -101,11 +101,11 @@ export const getDashboardData = async (
     }
   }
   
-  const toISO = (date: ClientTimestamp | Date | string): string => {
-    if (typeof date === 'string') return date;
-    if (date instanceof ClientTimestamp) return date.toDate().toISOString();
-    return date.toISOString();
-  };
+    const toISO = (date: ClientTimestamp | Date | string): string => {
+        if (typeof date === 'string') return date;
+        if (date instanceof ClientTimestamp) return date.toDate().toISOString();
+        return date.toISOString();
+    };
 
   let payloadRange: { startDate: string; endDate: string; } | undefined = undefined;
   if (period === 'custom' && customRange) {
@@ -169,8 +169,8 @@ export const getDashboardData = async (
         
         return new Date().toISOString(); 
       };
-
-      return {
+    
+    return {
         id: orderBE.id,
         userId: orderBE.userId || null,
         customerName: `${orderBE.shippingAddress?.firstName || ''} ${orderBE.shippingAddress?.lastName || ''}`.trim() || 'N/A',

@@ -9,15 +9,15 @@
 export interface UserAddressClient {
   id?: string; // Optional if Firestore generates it and it's added after creation
   name?: string; 
-  street: string; 
-  city: string; 
-  state: string; 
-  zipCode: string; 
-  country: string; 
+  street: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
   isDefault?: boolean;
   // createdAt?: ClientTimestamp | string; // client-friendly timestamp
   // updatedAt?: ClientTimestamp | string;
-}
+  }
 
 export type UserRoleClient = 'customer' | 'admin' | 'editor';
 

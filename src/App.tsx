@@ -25,6 +25,7 @@ import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
 import ForgotPassword from './pages/ForgotPassword';
 import WishlistPage from './pages/WishlistPage';
+import ProductListingPage from './pages/ProductListingPage'; // New PLP component
 
 // Admin Pages (Consider lazy loading for these if not already)
 import AdminLayout from './components/layout/AdminLayout'; // Assuming AdminLayout handles its own auth
@@ -66,6 +67,8 @@ const App = () => (
                       <Route path="/" element={<Home />} />
                       <Route path="/products" element={<Products />} />
                       <Route path="/products/:category" element={<Products />} />
+                      <Route path="/product-listing/:category" element={<ProductListingPage />} /> {/* Route for new PLP */}
+                      <Route path="/product-listing" element={<ProductListingPage />} /> {/* Generic PLP route */}
                       <Route path="/product/:productId" element={<ProductDetail />} />
                       <Route path="/cart" element={<Cart />} />
                       <Route path="/checkout" element={<Checkout />} />

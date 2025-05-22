@@ -91,16 +91,16 @@ interface ProductUpdateWriteDataBE extends ProductUpdateDataBE {
 console.log(`(Service-Backend) Product Service BE: Using Firestore collection: ${PRODUCTS_COLLECTION}`);
 
 const generateBaseSlug = (text: string): string => {
-  if (!text) return 'product';
+  if (!text) return 'product'; 
   return text
     .toString()
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, '-')
+    .replace(/\s+/g, '-')      
     .replace(/[^\w-]+/g, '')
     .replace(/--+/g, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '');
+    .replace(/^-+/, '')         
+    .replace(/-+$/, '');        
 };
 
 const generateUniqueSlugBE = async (baseText: string, currentProductId?: string): Promise<string> => {

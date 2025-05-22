@@ -1,0 +1,155 @@
+.page-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f1f3f6; /* Flipkart background gray */
+}
+
+.plp-main-content {
+  flex-grow: 1;
+  padding: 16px;
+  max-width: 1200px; /* Max width similar to Flipkart */
+  margin: 0 auto; /* Center content */
+  width: 100%;
+}
+
+.plp-breadcrumb {
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: #878787; /* Flipkart secondary text */
+}
+
+.plp-layout {
+  display: flex;
+  gap: 16px;
+}
+
+.plp-filters-sidebar {
+  width: 280px; /* PRD 3.7: Filter Sidebar width */
+  background-color: #ffffff;
+  padding: 16px;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.plp-filters-sidebar h2 {
+  font-size: 16px; /* PRD 3.2: Header size */
+  font-weight: 500; /* PRD 3.2: Header weight */
+  color: #212121; /* Flipkart primary text */
+  margin-bottom: 16px;
+}
+
+.filter-section {
+  margin-bottom: 20px;
+}
+
+.filter-section h4 {
+  font-size: 14px; /* PRD 3.7: Filter section headers */
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.clear-all-filters {
+  font-size: 12px; /* PRD 3.7: Clear All button */
+  font-weight: 500;
+  color: #2874F0; /* Flipkart Blue */
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+.plp-products-area {
+  flex-grow: 1;
+  background-color: #ffffff;
+  padding: 16px;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.plp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.plp-header h1 {
+  font-size: 18px; /* PRD 3.2: Header size */
+  font-weight: 500;
+  color: #212121;
+}
+
+.plp-sort-options label {
+  font-size: 14px; /* PRD 3.7: Sort dropdown text */
+  color: #212121;
+  margin-right: 8px;
+}
+
+.plp-sort-options select {
+  padding: 8px;
+  border: 1px solid #e0e0e0; /* Flipkart border gray */
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.plp-applied-filters {
+  margin-bottom: 16px;
+  /* Chips styling will be added here */
+}
+
+.plp-product-grid {
+  display: grid;
+  /* Grid columns will be set based on PRD 3.7 (4 desktop, 2 mobile) */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Responsive grid */
+  gap: 16px; /* PRD 3.7: Gap between products */
+}
+
+.plp-pagination {
+  margin-top: 24px;
+  text-align: center;
+  /* Pagination styling will be added here */
+}
+
+/* Basic placeholder for ProductCard if not globally styled */
+.product-card-placeholder {
+  border: 1px solid #e0e0e0;
+  padding: 16px;
+  text-align: center;
+  background-color: #f9f9f9;
+  height: 250px; /* Example height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile Responsiveness (basic example) */
+@media (max-width: 767px) { /* PRD 4.1: Mobile breakpoint */
+  .plp-layout {
+    flex-direction: column;
+  }
+
+  .plp-filters-sidebar {
+    width: 100%; /* Full width on mobile, will be a drawer/bottom sheet */
+    margin-bottom: 16px;
+  }
+
+  .plp-product-grid {
+    /* PRD 3.7: 2 columns mobile */
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .plp-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .plp-sort-options {
+    margin-top: 8px;
+    width: 100%;
+  }
+
+  .plp-sort-options select {
+    width: 100%;
+  }
+}

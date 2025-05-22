@@ -1,18 +1,35 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import Layout from '../components/layout/Layout';
-import ProductList from '../components/products/ProductList';
+import { MainLayout } from '../components/layout/MainLayout';
+import ProductCard from '../components/products/ProductCard';
 import ProductFilter, { FilterOptions } from '../components/products/ProductFilter';
-import { Product as LocalProduct } from '../types/product'; // Renamed to avoid conflict
+import { Product as LocalProduct } from '../types/product';
 import {
-  getProducts as fetchServiceProducts, // Renamed to avoid conflict with component name
+  getProducts as fetchServiceProducts,
   GetAllProductsOptions as ServiceGetAllProductsOptions, 
   Product as ServiceProduct,
-  ClientDocumentSnapshot // Import ClientDocumentSnapshot
+  ClientDocumentSnapshot
 } from '../services/productService';
 import ProductCardSkeleton from '../components/products/ProductCardSkeleton';
-import { Button } from '@/components/ui/button'; // Import Button for Load More
-import { Loader2 } from 'lucide-react'; // For Load More button loading state
+import { Button } from '@/components/ui/button';
+import { 
+  Loader2, 
+  ChevronDown, 
+  ArrowDownUp, 
+  CheckSquare, 
+  Filter,
+  X,
+  ArrowLeft
+} from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetClose,
+  SheetFooter,
+} from "@/components/ui/sheet";
 
 // Helper function to map service product to local client product
 const mapServiceProductToLocalProduct = (serviceProduct: ServiceProduct): LocalProduct => {
@@ -35,26 +52,40 @@ const mapServiceProductToLocalProduct = (serviceProduct: ServiceProduct): LocalP
     discount: discount,
     createdAt: serviceProduct.createdAt ? serviceProduct.createdAt.toDate().toISOString() : new Date().toISOString(),
     updatedAt: serviceProduct.updatedAt ? serviceProduct.updatedAt.toDate().toISOString() : new Date().toISOString(),
-    // seo: undefined, // Assuming SEO is handled separately
   };
 };
 
-const PRODUCTS_PER_PAGE = 9; // Number of products to load per page/batch
+const PRODUCTS_PER_PAGE = 16; // Increased number of products per page
+
+// Sort options for Flipkart style
+const sortOptions = [
+  { value: 'relevance', label: 'Popularity' },
+  { value: 'price-low', label: 'Price -- Low to High' },
+  { value: 'price-high', label: 'Price -- High to Low' },
+  { value: 'newest', label: 'Newest First' },
+];
 
 const Products = () => {
   const [searchParams] = useSearchParams();
   const [filteredProducts, setFilteredProducts] = useState<LocalProduct[]>([]);
-  const [loading, setLoading] = useState(true); // For initial load and filter changes
-  const [isLoadingMore, setIsLoadingMore] = useState(false); // For "Load More" action
+  const [loading, setLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasFetchedOnce, setHasFetchedOnce] = useState(false); // To track initial load for skeletons
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
   const [lastVisibleDoc, setLastVisibleDoc] = useState<ClientDocumentSnapshot | undefined>(undefined);
   const [hasNextPage, setHasNextPage] = useState(true);
+  const [sortBy, setSortBy] = useState('relevance');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   
-  // Mocked or simplified filter options - these would ideally come from backend services
-  const [categories, setCategories] = useState<string[]>([]); // TODO: Fetch from categoryService
-  const [tags, setTags] = useState<string[]>([]); // TODO: Fetch or derive from products
-  const [maxPrice, setMaxPrice] = useState(10000); // TODO: Fetch or derive from products
+  // Mocked or simplified filter options
+  const [categories, setCategories] = useState<string[]>([
+    'Electronics', 'Clothing', 'Home & Garden', 'Books', 'Sports', 'Toys',
+    'Beauty', 'Grocery', 'Appliances', 'Furniture'
+  ]);
+  const [tags, setTags] = useState<string[]>([
+    'New', 'Bestseller', 'Sale', 'Trending', 'Premium'
+  ]);
+  const [maxPrice, setMaxPrice] = useState(100000);
   
   const categoryParam = searchParams.get('category');
   const searchQueryParam = searchParams.get('search');
@@ -64,17 +95,16 @@ const Products = () => {
       setIsLoadingMore(true);
     } else {
       setLoading(true);
-      // Reset products and pagination for a new fetch/filter
-      setFilteredProducts([]); 
+      setFilteredProducts([]);
       setLastVisibleDoc(undefined);
-      setHasNextPage(true); // Assume there's a next page until fetch proves otherwise
+      setHasNextPage(true);
     }
     setError(null);
 
     try {
       const fetchOptions: ServiceGetAllProductsOptions = {
         ...options,
-        isEnabled: true, // Default to enabled
+        isEnabled: true,
         limit: PRODUCTS_PER_PAGE,
       };
       if (categoryParam && !fetchOptions.categoryId) {
@@ -87,7 +117,7 @@ const Products = () => {
       const response = await fetchServiceProducts(fetchOptions);
       let clientProducts = response.products.map(mapServiceProductToLocalProduct);
       
-      if (searchQueryParam) { // Apply client-side search after fetching
+      if (searchQueryParam) {
         const lowerQuery = searchQueryParam.toLowerCase();
         clientProducts = clientProducts.filter(p => 
           p.name.toLowerCase().includes(lowerQuery) || 
@@ -95,6 +125,9 @@ const Products = () => {
           (p.tags && p.tags.some(t => t.toLowerCase().includes(lowerQuery)))
         );
       }
+      
+      // Apply client-side sorting
+      clientProducts = sortProducts(clientProducts, sortBy);
       
       setFilteredProducts(prevProducts => isLoadMore ? [...prevProducts, ...clientProducts] : clientProducts);
       setLastVisibleDoc(response.lastVisible);
@@ -111,36 +144,54 @@ const Products = () => {
         setHasFetchedOnce(true);
       }
     }
-  }, [categoryParam, searchQueryParam, lastVisibleDoc]);
+  }, [categoryParam, searchQueryParam, lastVisibleDoc, sortBy]);
+
+  // Sort products function
+  const sortProducts = (products: LocalProduct[], sortOption: string) => {
+    const sortedProducts = [...products];
+    
+    switch (sortOption) {
+      case 'price-low':
+        sortedProducts.sort((a, b) => a.price - b.price);
+        break;
+      case 'price-high':
+        sortedProducts.sort((a, b) => b.price - a.price);
+        break;
+      case 'newest':
+        sortedProducts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+      default: // 'relevance' or 'popularity'
+        sortedProducts.sort((a, b) => b.featured - a.featured);
+        break;
+    }
+    
+    return sortedProducts;
+  };
 
   useEffect(() => {
-    // Initial fetch, not loading more, no specific filter options beyond URL params
-    fetchProductsCallback({}); 
+    fetchProductsCallback({});
   }, [categoryParam, searchQueryParam, fetchProductsCallback]);
 
+  // Re-sort products when sort option changes
+  useEffect(() => {
+    if (filteredProducts.length > 0 && hasFetchedOnce) {
+      const sortedProducts = sortProducts(filteredProducts, sortBy);
+      setFilteredProducts(sortedProducts);
+    }
+  }, [sortBy]);
   
   const handleFilterChange = useCallback(async (filterValues: FilterOptions) => {
     const options: ServiceGetAllProductsOptions = { isEnabled: true };
 
     if (filterValues.categories.length > 0) {
-      options.categoryId = filterValues.categories[0]; 
+      options.categoryId = filterValues.categories[0];
     }
     if (filterValues.priceRange) {
       options.minPrice = filterValues.priceRange[0];
       options.maxPrice = filterValues.priceRange[1];
     }
     
-    // Fetch with new filters, this is a fresh load, not "load more"
-    // The fetchProductsCallback will handle resetting products and pagination state (lastVisibleDoc etc.)
     await fetchProductsCallback(options, false);
-
-    // Client-side filtering part is removed from here as fetchProductsCallback now handles 
-    // setting filteredProducts directly after server fetch and applying search query.
-    // If additional client-side filtering beyond search (like tags, onSale, inStock from the form)
-    // is still needed after the paginated fetch, it would need careful re-integration
-    // to operate on the current `filteredProducts` state or be part of the options sent to backend if possible.
-    // For now, simplifying by assuming most filters map to service options or search.
-
   }, [fetchProductsCallback]);
   
   const handleLoadMore = () => {
@@ -151,28 +202,48 @@ const Products = () => {
 
   const getTitle = () => {
     if (categoryParam) {
-      return `${categoryParam.charAt(0).toUpperCase() + categoryParam.slice(1)} Products`;
+      return `${categoryParam.charAt(0).toUpperCase() + categoryParam.slice(1)}`;
     } else if (searchQueryParam) {
-      return `Search Results: "${searchQueryParam}"`;
+      return `Search Results for "${searchQueryParam}"`;
     }
     return 'All Products';
   };
   
   return (
-    <Layout>
-        <div className="container mx-auto py-8 px-4">
-          <h1 className="text-3xl font-bold mb-6">{getTitle()}</h1>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Filters sidebar */}
-            <div className="lg:col-span-1">
+    <MainLayout>
+      <div className="bg-flipkart-gray-background min-h-screen">
+        {/* Breadcrumb - hidden on mobile */}
+        <div className="hidden md:block container pt-3 pb-1">
+          <div className="text-flipkart-small text-flipkart-gray-secondary-text">
+            Home {categoryParam && '>'} {categoryParam && <span className="text-flipkart-blue">{categoryParam}</span>}
+          </div>
+        </div>
+        
+        {/* Title Bar */}
+        <div className="bg-white p-4 shadow-sm mb-3">
+          <div className="container">
+            <div className="flex items-center justify-between">
+              <h1 className="text-flipkart-header-md font-medium">
+                {getTitle()}
+                <span className="text-flipkart-small text-flipkart-gray-secondary-text ml-2">
+                  ({filteredProducts.length} {filteredProducts.length === 1 ? 'Product' : 'Products'})
+                </span>
+              </h1>
+            </div>
+          </div>
+        </div>
+        
+        <div className="container pb-6">
+          <div className="flex flex-col md:flex-row gap-3">
+            {/* Desktop Filter Sidebar */}
+            <div className="hidden md:block w-1/4">
               <ProductFilter 
                 categories={categories}
                 tags={tags}
                 maxPrice={maxPrice}
                 onFilterChange={handleFilterChange}
                 initialFilters={{
-                categories: categoryParam ? [categoryParam] : [],
+                  categories: categoryParam ? [categoryParam] : [],
                   tags: [],
                   priceRange: [0, maxPrice],
                   inStock: false,
@@ -181,55 +252,121 @@ const Products = () => {
               />
             </div>
             
-            {/* Product listing */}
-            <div className="lg:col-span-3">
-            {loading && !hasFetchedOnce ? (
-                // Show Skeletons on initial load
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                  {[...Array(6)].map((_, index) => <ProductCardSkeleton key={index} />)}
+            {/* Product Listing Area */}
+            <div className="flex-1">
+              {/* Sort Bar */}
+              <div className="bg-white p-3 mb-3 shadow-sm flex items-center justify-between">
+                <div className="font-medium text-flipkart-body">Sort By</div>
+                <div className="flex gap-3">
+                  {sortOptions.map(option => (
+                    <button
+                      key={option.value}
+                      className={`px-3 py-1 text-flipkart-body ${sortBy === option.value 
+                        ? 'text-flipkart-blue font-medium' 
+                        : 'text-flipkart-gray-primary-text'}`}
+                      onClick={() => setSortBy(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
-            ) : error ? (
-               <div className="text-center">
-                  <h2 className="text-2xl font-bold text-red-500 mb-2">Oops!</h2>
-                  <p className="text-gray-600 mb-4">{error}</p>
-                  <button 
-                    onClick={() => fetchProductsCallback()} // Re-fetch on error
-                    className="px-4 py-2 bg-brand-teal text-white rounded-md hover:bg-brand-dark"
-                  >
-                    Try Again
-                  </button>
+                
+                {/* Mobile Filter Button */}
+                <div className="md:hidden">
+                  <Sheet open={showMobileFilters} onOpenChange={setShowMobileFilters}>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center">
+                        <Filter className="mr-1 h-4 w-4" />
+                        Filters
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="w-full sm:w-80 p-0">
+                      <SheetHeader className="border-b border-flipkart-gray-border h-14 flex items-center px-4">
+                        <SheetClose className="absolute left-4 top-4">
+                          <X className="h-5 w-5" />
+                        </SheetClose>
+                        <SheetTitle className="ml-8 text-flipkart-header-sm">Filters</SheetTitle>
+                      </SheetHeader>
+                      <div className="overflow-y-auto h-[calc(100%-7rem)]">
+                        <ProductFilter
+                          categories={categories}
+                          tags={tags}
+                          maxPrice={maxPrice}
+                          onFilterChange={handleFilterChange}
+                          initialFilters={{
+                            categories: categoryParam ? [categoryParam] : [],
+                            tags: [],
+                            priceRange: [0, maxPrice],
+                            inStock: false,
+                            onSale: false
+                          }}
+                        />
+                      </div>
+                      <SheetFooter className="border-t border-flipkart-gray-border h-14 px-4 flex justify-between">
+                        <Button variant="outline" size="lg" className="w-full">RESET</Button>
+                        <SheetClose asChild>
+                          <Button size="lg" className="w-full bg-flipkart-blue hover:bg-flipkart-blue/90">APPLY</Button>
+                        </SheetClose>
+                      </SheetFooter>
+                    </SheetContent>
+                  </Sheet>
                 </div>
-            ) : filteredProducts.length === 0 && !loading ? (
-              <div className="text-center py-10">
-                  <p className="text-xl text-gray-600">No products found matching your criteria.</p>
-                </div>
-              ) : (
-                <ProductList 
-                title={getTitle()} // This title might be redundant if h1 is already there
-                  products={filteredProducts}
-                category={categoryParam || undefined}
-                />
-              )}
-              {hasNextPage && !loading && (
-                <div className="mt-8 text-center">
-                  <Button 
-                    onClick={handleLoadMore} 
-                    disabled={isLoadingMore}
-                    variant="outline"
-                    size="lg"
-                  >
-                    {isLoadingMore ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
-                    ) : (
-                      'Load More Products'
-                    )}
-                  </Button>
-                </div>
-              )}
+              </div>
+              
+              {/* Products Grid */}
+              <div className="bg-white shadow-sm p-3">
+                {loading && !hasFetchedOnce ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
+                    {[...Array(8)].map((_, index) => <ProductCardSkeleton key={index} />)}
+                  </div>
+                ) : error ? (
+                  <div className="text-center py-10">
+                    <h2 className="text-flipkart-header-md text-red-500 mb-2">Something went wrong</h2>
+                    <p className="text-flipkart-body text-flipkart-gray-secondary-text mb-4">{error}</p>
+                    <Button 
+                      onClick={() => fetchProductsCallback()} 
+                      className="bg-flipkart-blue hover:bg-flipkart-blue/90"
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                ) : filteredProducts.length === 0 && !loading ? (
+                  <div className="text-center py-10">
+                    <p className="text-flipkart-header-sm text-flipkart-gray-primary-text">
+                      No products found matching your criteria.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
+                    {filteredProducts.map(product => (
+                      <ProductCard key={product.id} product={product} />
+                    ))}
+                  </div>
+                )}
+                
+                {/* Load More Button */}
+                {hasNextPage && !loading && filteredProducts.length > 0 && (
+                  <div className="mt-6 text-center">
+                    <Button 
+                      onClick={handleLoadMore} 
+                      disabled={isLoadingMore}
+                      className="bg-flipkart-blue hover:bg-flipkart-blue/90"
+                      size="lg"
+                    >
+                      {isLoadingMore ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
+                      ) : (
+                        'Load More Products'
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-    </Layout>
+      </div>
+    </MainLayout>
   );
 };
 

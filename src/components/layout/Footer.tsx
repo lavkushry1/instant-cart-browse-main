@@ -1,102 +1,270 @@
 import { Link } from 'react-router-dom';
-import { CurrencySelector } from '@/components/currency/CurrencySelector';
+import { 
+  ArrowRight, 
+  Facebook, 
+  Instagram, 
+  Youtube, 
+  Twitter, 
+  Mail, 
+  Phone, 
+  HelpCircle,
+  Gift,
+  Truck,
+  CreditCard,
+  ShieldCheck,
+  Package,
+  RefreshCw,
+  Star
+} from 'lucide-react';
 
 export const Footer = () => {
   const currentYear = new Date().getFullYear();
   
-  const footerLinks = [
-    {
-      title: 'Shop',
-      links: [
-        { name: 'All Products', path: '/products' },
-        { name: 'Deals', path: '/deals' },
-        { name: 'New Arrivals', path: '/products/new' },
-        { name: 'Best Sellers', path: '/products/best-sellers' },
-      ]
-    },
-    {
-      title: 'Customer Service',
-      links: [
-        { name: 'Contact Us', path: '/contact' },
-        { name: 'FAQs', path: '/faq' },
-        { name: 'Shipping & Returns', path: '/shipping' },
-        { name: 'Track Order', path: '/track-order' },
-      ]
-    },
-    {
-      title: 'Company',
-      links: [
-        { name: 'About Us', path: '/about' },
-        { name: 'Careers', path: '/careers' },
-        { name: 'Blog', path: '/blog' },
-        { name: 'Privacy Policy', path: '/privacy' },
-        { name: 'Terms of Service', path: '/terms' },
-      ]
-    }
+  const aboutLinks = [
+    { label: 'Contact Us', href: '/contact' },
+    { label: 'About Us', href: '/about' },
+    { label: 'Careers', href: '/careers' },
+    { label: 'Flipkart Stories', href: '/stories' },
+    { label: 'Press', href: '/press' },
+    { label: 'Corporate Information', href: '/corporate-info' },
+  ];
+  
+  const helpLinks = [
+    { label: 'Payments', href: '/help/payments' },
+    { label: 'Shipping', href: '/help/shipping' },
+    { label: 'Cancellation & Returns', href: '/help/returns' },
+    { label: 'FAQ', href: '/help/faq' },
+    { label: 'Track Orders', href: '/track-order' },
+  ];
+  
+  const policyLinks = [
+    { label: 'Return Policy', href: '/return-policy' },
+    { label: 'Terms of Use', href: '/terms' },
+    { label: 'Security', href: '/security' },
+    { label: 'Privacy', href: '/privacy' },
+    { label: 'Sitemap', href: '/sitemap' },
+    { label: 'EPR Compliance', href: '/epr-compliance' },
+  ];
+
+  const consumerLinks = [
+    { label: 'Advertise', href: '/advertise' },
+    { label: 'Gift Cards', href: '/gift-cards' },
+    { label: 'Help Center', href: '/help-center' },
+    { label: 'Become a Seller', href: '/seller' },
+  ];
+  
+  const socialLinks = [
+    { label: 'Facebook', icon: <Facebook size={18} />, href: 'https://facebook.com' },
+    { label: 'Twitter', icon: <Twitter size={18} />, href: 'https://twitter.com' },
+    { label: 'YouTube', icon: <Youtube size={18} />, href: 'https://youtube.com' },
+    { label: 'Instagram', icon: <Instagram size={18} />, href: 'https://instagram.com' },
   ];
 
   return (
-    <footer className="border-t bg-background">
-      <div className="container py-8 md:py-12">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-5">
-          {/* Logo & Store Info */}
-          <div className="lg:col-span-2">
-            <Link to="/" className="inline-block text-xl font-bold mb-4">
-              Instant<span className="text-primary">Cart</span>
-            </Link>
-            <p className="text-muted-foreground mb-4 max-w-xs">
-              Fast, reliable e-commerce platform for all your shopping needs.
-            </p>
-            
-            {/* Currency Selector */}
-            <div className="mb-6">
-              <p className="text-sm font-medium mb-2">Select Currency</p>
-              <CurrencySelector position="footer" showLabel />
+    <footer>
+      {/* Top Features Section */}
+      <div className="bg-white border-t border-flipkart-gray-border py-4">
+        <div className="container px-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="flex items-center">
+              <Truck className="h-6 w-6 mr-3 text-flipkart-gray-secondary-text" />
+              <div>
+                <h4 className="text-flipkart-body font-medium">Free Delivery</h4>
+                <p className="text-flipkart-small text-flipkart-gray-secondary-text">
+                  On orders above ₹499
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <RefreshCw className="h-6 w-6 mr-3 text-flipkart-gray-secondary-text" />
+              <div>
+                <h4 className="text-flipkart-body font-medium">Easy Returns</h4>
+                <p className="text-flipkart-small text-flipkart-gray-secondary-text">
+                  10 day return policy
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <ShieldCheck className="h-6 w-6 mr-3 text-flipkart-gray-secondary-text" />
+              <div>
+                <h4 className="text-flipkart-body font-medium">Secure Payment</h4>
+                <p className="text-flipkart-small text-flipkart-gray-secondary-text">
+                  100% secure checkout
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <Package className="h-6 w-6 mr-3 text-flipkart-gray-secondary-text" />
+              <div>
+                <h4 className="text-flipkart-body font-medium">Authentic Products</h4>
+                <p className="text-flipkart-small text-flipkart-gray-secondary-text">
+                  Sourced directly
+                </p>
+              </div>
             </div>
           </div>
-
-          {/* Footer Link Sections */}
-          {footerLinks.map((section) => (
-            <div key={section.title}>
-              <h3 className="font-medium mb-3">{section.title}</h3>
-              <ul className="space-y-2">
-                {section.links.map((link) => (
-                  <li key={link.name}>
-                    <Link 
-                      to={link.path} 
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
         </div>
-        
-        {/* Bottom Bar */}
-        <div className="flex flex-col sm:flex-row justify-between items-center border-t mt-8 pt-8">
-          <p className="text-sm text-muted-foreground">
-            &copy; {currentYear} InstantCart. All rights reserved.
-          </p>
-          
-          <div className="flex space-x-6 mt-4 sm:mt-0">
-            <a href="#" aria-label="Instagram" className="text-muted-foreground hover:text-foreground">
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.418 0-8-3.582-8-8s3.582-8 8-8 8 3.582 8 8-3.582 8-8 8zm4-9a1 1 0 100-2 1 1 0 000 2zm-8 0a1 1 0 100-2 1 1 0 000 2zm.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm7.072 0l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 1.414zm-3.536-.05A.997.997 0 0112 16a.997.997 0 01-.964-.05.997.997 0 01-.964.05 1 1 0 11.964-1.9.997.997 0 01.964.05z" clipRule="evenodd" />
-              </svg>
-            </a>
-            <a href="#" aria-label="Twitter" className="text-muted-foreground hover:text-foreground">
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path fillRule="evenodd" d="M22 5.897c-.75.33-1.5.577-2.333.66A4.4 4.4 0 0021.5 4.33c-.833.495-1.75.825-2.75 1.155C17.833 4.495 16.583 4 15.25 4c-2.75 0-4.833 2.063-4.833 4.542 0 .33 0 .66.083.99-4-.165-7.583-2.063-9.917-4.95-.417.66-.667 1.485-.667 2.31 0 1.65.833 3.135 2.167 3.96-.75 0-1.5-.165-2.167-.495v.066c0 2.31 1.667 4.208 3.917 4.62-.417.082-.833.165-1.25.165-.333 0-.583 0-.917-.082.667 1.98 2.5 3.3 4.667 3.3-1.667 1.32-3.833 2.145-6.167 2.145-.417 0-.75 0-1.167-.083 2.25 1.485 4.833 2.31 7.583 2.31 9.083 0 14-7.425 14-13.86 0-.165 0-.33 0-.495.917-.66 1.75-1.485 2.417-2.475z" clipRule="evenodd" />
-              </svg>
-            </a>
-            <a href="#" aria-label="Facebook" className="text-muted-foreground hover:text-foreground">
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
-              </svg>
-            </a>
+      </div>
+
+      {/* Main Footer Content */}
+      <div className="bg-flipkart-dark text-white py-10">
+        <div className="container px-4">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+            {/* About & Help Section - 7 columns */}
+            <div className="md:col-span-7 grid grid-cols-1 md:grid-cols-4 gap-8">
+              {/* About */}
+              <div>
+                <h3 className="text-[#878787] text-xs uppercase font-medium mb-3">ABOUT</h3>
+                <ul className="space-y-2">
+                  {aboutLinks.map((link) => (
+                    <li key={link.label}>
+                      <Link 
+                        to={link.href} 
+                        className="text-white text-xs hover:underline"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              {/* Help */}
+              <div>
+                <h3 className="text-[#878787] text-xs uppercase font-medium mb-3">HELP</h3>
+                <ul className="space-y-2">
+                  {helpLinks.map((link) => (
+                    <li key={link.label}>
+                      <Link 
+                        to={link.href} 
+                        className="text-white text-xs hover:underline"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              {/* Policy */}
+              <div>
+                <h3 className="text-[#878787] text-xs uppercase font-medium mb-3">POLICY</h3>
+                <ul className="space-y-2">
+                  {policyLinks.map((link) => (
+                    <li key={link.label}>
+                      <Link 
+                        to={link.href} 
+                        className="text-white text-xs hover:underline"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Consumer */}
+              <div>
+                <h3 className="text-[#878787] text-xs uppercase font-medium mb-3">CONSUMER POLICY</h3>
+                <ul className="space-y-2">
+                  {consumerLinks.map((link) => (
+                    <li key={link.label}>
+                      <Link 
+                        to={link.href} 
+                        className="text-white text-xs hover:underline"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-4">
+                  <h3 className="text-[#878787] text-xs uppercase font-medium mb-3">PLUS</h3>
+                  <Link to="/plus" className="flex items-center text-xs hover:underline">
+                    <span>Flipkart Plus</span>
+                    <img 
+                      src="/flipkart-plus-icon.svg" 
+                      alt="Plus" 
+                      className="w-3 h-3 ml-1"
+                    />
+                  </Link>
+                </div>
+              </div>
+            </div>
+            
+            {/* Vertical Line */}
+            <div className="hidden md:block md:col-span-1 border-l border-gray-700 mx-auto h-full"></div>
+            
+            {/* Mail & Address - 4 columns */}
+            <div className="md:col-span-4">
+              <div className="mb-8">
+                <h3 className="text-[#878787] text-xs uppercase font-medium mb-3">MAIL US</h3>
+                <p className="text-white text-xs leading-5">
+                  Flipkart Internet Private Limited,<br />
+                  Buildings Alyssa, Begonia &<br />
+                  Clove Embassy Tech Village,<br />
+                  Outer Ring Road, Devarabeesanahalli Village,<br />
+                  Bengaluru, 560103,<br />
+                  Karnataka, India
+                </p>
+              </div>
+              
+              <div>
+                <h3 className="text-[#878787] text-xs uppercase font-medium mb-3">REGISTERED OFFICE ADDRESS</h3>
+                <p className="text-white text-xs leading-5">
+                  Flipkart Internet Private Limited,<br />
+                  Buildings Alyssa, Begonia &<br />
+                  Clove Embassy Tech Village,<br />
+                  Outer Ring Road, Devarabeesanahalli Village,<br />
+                  Bengaluru, 560103,<br />
+                  Karnataka, India<br />
+                  CIN: U51109KA2012PTC066107<br />
+                  Telephone: <a href="tel:18002089898" className="hover:underline">1800 208 9898</a>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Payment Partners */}
+      <div className="bg-[#172337] py-5 border-t border-gray-700">
+        <div className="container px-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center">
+              <img src="/payment/visa.png" alt="Visa" className="h-6 mr-3" />
+              <img src="/payment/mastercard.png" alt="Mastercard" className="h-6 mr-3" />
+              <img src="/payment/paytm.png" alt="Paytm" className="h-6 mr-3" />
+              <img src="/payment/rupay.png" alt="RuPay" className="h-6 mr-3" />
+              <img src="/payment/upi.png" alt="UPI" className="h-6" />
+            </div>
+            <div className="flex gap-4">
+              {socialLinks.map((social) => (
+                <a 
+                  key={social.label}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white hover:text-flipkart-blue"
+                  aria-label={social.label}
+                >
+                  {social.icon}
+                </a>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-700 flex flex-wrap justify-between items-center">
+            <p className="text-xs text-[#878787]">
+              &copy; 2007-{currentYear} Flipkart.com
+            </p>
+            <div className="flex items-center">
+              <img 
+                src="/images/flipkart-icon.png" 
+                alt="Flipkart" 
+                className="h-6 mr-2"
+              />
+              <p className="text-xs text-white">India's most trusted e-commerce platform</p>
+            </div>
           </div>
         </div>
       </div>

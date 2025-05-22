@@ -91,16 +91,16 @@ const emptyProductForm: ProductCreationData = {
 
 // Client-side slug generation helper (duplicate from backend for now)
 const generateSlugForClient = (name: string): string => {
-  if (!name) return '';
+  if (!name) return ''; 
   return name
     .toString()
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, '-')
+    .replace(/\s+/g, '-')      
     .replace(/[^\w-]+/g, '')
     .replace(/--+/g, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '');
+    .replace(/^-+/, '')         
+    .replace(/-+$/, '');        
 };
 
 const ProductForm = () => {

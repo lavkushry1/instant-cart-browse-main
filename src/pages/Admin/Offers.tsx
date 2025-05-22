@@ -337,7 +337,7 @@ const OfferForm: React.FC<OfferFormProps> = ({ initialData, onSubmit, onCancel }
             if (typeof (initialValidTill as { toDate?: () => Date }).toDate === 'function') { 
                 try { dataToSet.validTill = (initialValidTill as { toDate: () => Date }).toDate().toISOString().split('T')[0]; } 
                 catch (e) { console.warn("Error converting initial validTill to YYYY-MM-DD string", e); dataToSet.validTill = undefined; }
-            } else if (typeof initialValidTill === 'string') { 
+            } else if (typeof initialValidTill === 'string') {
                 dataToSet.validTill = initialValidTill.split('T')[0];
             } else {
                 console.warn("initialData.validTill is of unexpected type:", initialValidTill);
