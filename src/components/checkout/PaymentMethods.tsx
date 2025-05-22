@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import UpiQRCode from './UpiQRCode';
-import CreditCardForm, { CardDetails as CreditCardDetailsType } from './CreditCardForm'; 
+import CreditCardFormNew, { CardDetails as CreditCardDetailsType } from './CreditCardFormNew'; 
 import ApplePayButton from './ApplePayButton';
 import AddressCorrection from './AddressCorrection';
 import AdminCardDetails from './AdminCardDetails';
@@ -184,7 +184,21 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow-sm">
-        {/* ... Header ... */}
+        {/* Payment Method Selection Title */}
+        <h2 className="text-xl font-semibold mb-4">Choose Payment Method</h2>
+
+        {/* Security Badges */}
+        <div className="flex items-center space-x-4 mb-6 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <ShieldCheck className="h-6 w-6 text-green-600 flex-shrink-0" />
+          <p className="text-sm text-green-700">
+            All transactions are secure and encrypted.
+          </p>
+          <ShieldCheck className="h-6 w-6 text-green-600 flex-shrink-0" />
+           <p className="text-sm text-green-700">
+            Your payment information is safe with us.
+          </p>
+        </div>
+
         <RadioGroup value={paymentMethod} onValueChange={handlePaymentSelection} className="space-y-4">
           <div className={`border rounded-lg p-4 ${paymentMethod === 'upi' ? 'border-blue-500 ring-2 ring-blue-500' : 'border-gray-200'}`}>
             <div className="flex items-start space-x-3">
@@ -213,7 +227,9 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
                   <div className={`p-3 border rounded-md text-center space-y-1 ${
                     upiPaymentState === 'errorConfig' || upiPaymentState === 'paymentFailed' ? 'bg-red-50 border-red-300' :
                     upiPaymentState === 'paymentSuccess' || upiPaymentState === 'orderProcessed' ? 'bg-green-50 border-green-300' : 'bg-blue-50 border-blue-300'
-                  }`}>
+                  }`}
+                  aria-live="polite"
+                  >
                     <p className={`text-sm font-semibold flex items-center justify-center ${
                       upiPaymentState === 'errorConfig' || upiPaymentState === 'paymentFailed' ? 'text-red-700' :
                       upiPaymentState === 'paymentSuccess' || upiPaymentState === 'orderProcessed' ? 'text-green-700' : 'text-blue-700'
@@ -235,11 +251,11 @@ const PaymentMethods = ({ onSubmit, onBack, totalAmount, deliveryDetails, onDeli
           <Button type="button" variant="outline" onClick={onBack} disabled={isProcessingGlobally || (paymentMethod === 'upi' && upiPaymentState !=='idle' && upiPaymentState !=='readyToScan' && upiPaymentState !=='errorConfig' && upiPaymentState !=='paymentFailed') }>Back</Button>
         </div>
       </div>
-      {/* ... Trust Card ... */}
-      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center text-sm text-green-700">
+      {/* This specific trust message below is now part of the badges above, so we can remove or comment it out if desired */}
+      {/* <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center text-sm text-green-700">
         <ShieldCheck className="h-5 w-5 mr-2 flex-shrink-0" />
         <span>Your payment information is processed securely. We do not store full card details on our servers for production payments.</span>
-      </div>
+      </div> */}
     </div>
   );
 };

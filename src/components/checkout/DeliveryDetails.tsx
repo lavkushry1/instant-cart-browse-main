@@ -185,9 +185,10 @@ const DeliveryDetails = ({ initialValues, onSubmit }: DeliveryDetailsProps) => {
                         field.onChange(e);
                         verifyZipCode(e.target.value);
                       }}
+                      aria-describedby="zip-status-message"
                     />
                   </FormControl>
-                  {isVerifyingZip && <p className="text-xs text-muted-foreground mt-1">Verifying...</p>}
+                  {isVerifyingZip && <p id="zip-status-message" className="text-xs text-muted-foreground mt-1" aria-live="polite">Verifying...</p>}
                   <FormMessage />
                 </FormItem>
               )}

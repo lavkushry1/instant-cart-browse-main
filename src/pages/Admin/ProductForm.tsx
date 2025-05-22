@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { X, Plus, Upload, Trash2, Save, Loader2 } from 'lucide-react';
+import { X, Plus, Upload, Trash2, Save, Loader2, Bold, Italic, Underline } from 'lucide-react'; // Added Bold, Italic, Underline
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -84,6 +84,7 @@ const emptyProductForm: ProductCreationData = {
   tags: [],
   isEnabled: true,
   featured: false,
+  allowBackorders: false, // Added allowBackorders
   slug: '',
   seoTitle: '',
   seoDescription: '',
@@ -298,15 +299,38 @@ const ProductForm = () => {
         <CardHeader><CardTitle>{isEditMode ? 'Edit Product' : 'Add Product'}</CardTitle></CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-6">
+            <TabsList className="grid w-full grid-cols-4 mb-6"> {/* Consider adjusting grid-cols if tabs don't fit */}
               <TabsTrigger value="basic">Basic</TabsTrigger><TabsTrigger value="images">Images</TabsTrigger>
               <TabsTrigger value="pricing">Pricing</TabsTrigger><TabsTrigger value="inventory">Inventory</TabsTrigger>
-              <TabsTrigger value="organization">Organization</TabsTrigger><TabsTrigger value="visibility">Visibility</TabsTrigger>
+              {/* <TabsTrigger value="organization">Organization</TabsTrigger> */}
+              <TabsTrigger value="visibility">Visibility</TabsTrigger>
               <TabsTrigger value="seo">SEO</TabsTrigger>
             </TabsList>
             <TabsContent value="basic" className="space-y-4">
               <div><Label htmlFor="name">Name</Label><Input id="name" name="name" value={formData.name || ''} onChange={handleInputChange} required /></div>
-              <div><Label htmlFor="description">Description</Label><Textarea id="description" name="description" value={formData.description || ''} onChange={handleInputChange} /></div>
+              <div>
+                <Label htmlFor="description">Description</Label>
+                {/* Simulated Rich Text Editor Toolbar */}
+                <div className="flex items-center space-x-1 border border-input rounded-t-md p-2 bg-muted">
+                  <Button type="button" variant="outline" size="sm" className="p-2" onClick={() => toast.info('Bold (Placeholder)')} title="Bold">
+                    <Bold className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="p-2" onClick={() => toast.info('Italic (Placeholder)')} title="Italic">
+                    <Italic className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="p-2" onClick={() => toast.info('Underline (Placeholder)')} title="Underline">
+                    <Underline className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Textarea 
+                  id="description" 
+                  name="description" 
+                  value={formData.description || ''} 
+                  onChange={handleInputChange} 
+                  className="rounded-t-none min-h-[150px]"
+                  placeholder="Enter product description..."
+                />
+              </div>
               <div><Label htmlFor="categoryId">Category</Label>
                 <Select value={formData.categoryId || ''} onValueChange={handleCategoryChange} required>
                   <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
@@ -326,7 +350,7 @@ const ProductForm = () => {
                       {imageFiles.map(file => (
                         <li key={file.name} className="flex justify-between items-center">
                           {file.name} ({ (file.size / 1024).toFixed(2) } KB)
-                          <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveNewImageFile(file.name)}><Trash2 className="h-3 w-3 text-red-500" /></Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveNewImageFile(file.name)} aria-label="Remove new image"><Trash2 className="h-3 w-3 text-red-500" /></Button>
                         </li>
                       ))}
                     </ul>
@@ -346,6 +370,7 @@ const ProductForm = () => {
                           size="icon" 
                           className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={() => handleRemoveExistingImage(url)}
+                          aria-label="Remove existing image"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -362,10 +387,18 @@ const ProductForm = () => {
             <TabsContent value="inventory" className="space-y-4">
               <div><Label htmlFor="stock">Stock</Label><Input id="stock" name="stock" type="number" value={formData.stock || 0} onChange={handleNumericChange} /></div>
               <div><Label htmlFor="sku">SKU</Label><Input id="sku" name="sku" value={formData.sku || ''} onChange={handleInputChange} /></div>
+              <div className="flex items-center space-x-2 pt-2">
+                <Switch 
+                  id="allowBackorders" 
+                  checked={!!formData.allowBackorders} 
+                  onCheckedChange={handleToggleChange('allowBackorders' as keyof Product)} 
+                />
+                <Label htmlFor="allowBackorders">Allow Backorders?</Label>
+              </div>
             </TabsContent>
-            <TabsContent value="organization" className="space-y-4">
+            {/* <TabsContent value="organization" className="space-y-4"> */}
               {/* Add organization-specific fields here */}
-            </TabsContent>
+            {/* </TabsContent> */}
             <TabsContent value="visibility" className="space-y-2">
               <div className="flex items-center"><Switch id="isEnabled" checked={!!formData.isEnabled} onCheckedChange={handleToggleChange('isEnabled' as keyof Product)} /><Label htmlFor="isEnabled" className="ml-2">Product Enabled</Label></div>
               <div className="flex items-center"><Switch id="featured" checked={!!formData.featured} onCheckedChange={handleToggleChange('featured' as keyof Product)} /><Label htmlFor="featured" className="ml-2">Featured</Label></div>

@@ -153,10 +153,11 @@ const Register = () => {
                     value={formData.password}
                     onChange={handleChange}
                     required
+                    aria-describedby="password-strength-feedback password-requirements"
                   />
                   {formData.password && (
-                    <div className="mt-2">
-                      <div className="h-2 w-full bg-gray-200 rounded">
+                    <div className="mt-2" id="password-strength-feedback">
+                      <div className="h-2 w-full bg-gray-200 rounded" aria-hidden="true">
                         <div
                           className={`h-full rounded ${passwordStrengthDetails.color}`}
                           style={{ width: `${(passwordStrengthDetails.score / 7) * 100}%` }} // Max score is 7
@@ -171,7 +172,7 @@ const Register = () => {
                       </p>
                     </div>
                   )}
-                  <p className="text-xs text-muted-foreground pt-1">
+                  <p className="text-xs text-muted-foreground pt-1" id="password-requirements">
                     Password must be at least 6 characters long. Consider using a mix of uppercase, lowercase, numbers, and symbols for a stronger password.
                   </p>
                 </div>

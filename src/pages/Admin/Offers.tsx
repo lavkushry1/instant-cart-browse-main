@@ -31,13 +31,19 @@ interface DeleteOfferAdminResponse {
 
 // Interface for the form's state and submission data
 // Dates are strings in YYYY-MM-DD format for the form
-interface OfferFormData extends Omit<Partial<Offer>, 'validFrom' | 'validTill' | 'createdAt' | 'updatedAt' | 'condition'> {
+interface OfferFormData extends Omit<Partial<Offer>, 'validFrom' | 'validTill' | 'createdAt' | 'updatedAt' | 'condition' | 'usageLimits'> {
     validFrom?: string; 
     validTill?: string;
-    condition?: OfferServiceCondition; // Use the imported OfferCondition
-    // Ensure other fields are compatible or mapped if needed
-    productIds?: string[]; // Ensure these are handled as arrays of strings
-    categoryIds?: string[]; // Ensure these are handled as arrays of strings
+    condition?: OfferServiceCondition; 
+    productIds?: string[]; 
+    categoryIds?: string[];
+    // New fields for UI enhancements
+    bogoGetProductId?: string; // For BOGO type, placeholder for which product is "gotten"
+    minimumPurchaseAmount?: number;
+    usageLimits_totalRedemptions?: number; // Flattened for easier state management
+    usageLimits_perUser?: number;       // Flattened for easier state management
+    offerCode?: string;
+    // priority is already part of Offer type
 }
 
 // Callable function references
@@ -303,6 +309,11 @@ const OfferForm: React.FC<OfferFormProps> = ({ initialData, onSubmit, onCancel }
         priority: 0, 
         productIds: [], 
         categoryIds: [],
+        minimumPurchaseAmount: undefined,
+        usageLimits_totalRedemptions: undefined,
+        usageLimits_perUser: undefined,
+        offerCode: '',
+        bogoGetProductId: '',
     };
     
     let dataToSet: OfferFormData;
@@ -356,12 +367,13 @@ const OfferForm: React.FC<OfferFormProps> = ({ initialData, onSubmit, onCancel }
 
     if (type === 'checkbox') {
       processedValue = (e.target as HTMLInputElement).checked;
-    } else if (type === 'number' || name === 'priority' || name === 'discountPercent' || name === 'discountAmount' || name === 'condition.cartValueGreaterThan') {
+    } else if (type === 'number' || name === 'priority' || name === 'discountPercent' || name === 'discountAmount' || name === 'condition.cartValueGreaterThan' || name === 'minimumPurchaseAmount' || name === 'usageLimits_totalRedemptions' || name === 'usageLimits_perUser') {
       processedValue = value === '' ? undefined : parseFloat(value);
     } else if (name === 'productIds' || name === 'categoryIds') {
       processedValue = value.split(',').map(item => item.trim()).filter(item => item !== '');
-    } 
+    }
     // For date inputs (name 'validFrom' or 'validTill'), processedValue is already YYYY-MM-DD string.
+    // For text inputs like offerCode, bogoGetProductId, value is used directly.
     
     if (name.startsWith('condition.')) {
         const conditionField = name.split('.')[1];
@@ -384,58 +396,77 @@ const OfferForm: React.FC<OfferFormProps> = ({ initialData, onSubmit, onCancel }
     if(dataToSubmit.condition?.cartValueGreaterThan !== undefined) {
         dataToSubmit.condition.cartValueGreaterThan = Number(dataToSubmit.condition.cartValueGreaterThan);
     }
+    if(dataToSubmit.minimumPurchaseAmount !== undefined) dataToSubmit.minimumPurchaseAmount = Number(dataToSubmit.minimumPurchaseAmount);
+    if(dataToSubmit.usageLimits_totalRedemptions !== undefined) dataToSubmit.usageLimits_totalRedemptions = Number(dataToSubmit.usageLimits_totalRedemptions);
+    if(dataToSubmit.usageLimits_perUser !== undefined) dataToSubmit.usageLimits_perUser = Number(dataToSubmit.usageLimits_perUser);
     onSubmit(dataToSubmit);
   };
+  
+  const inputClass = "mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm";
   
   return (
     <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-xl p-6 md:p-8 mb-8 space-y-6">
       <h2 className="text-xl font-semibold text-gray-700 mb-4">{formData?.id ? 'Edit Offer' : 'Create New Offer'}</h2>
+      
       {/* Offer Name and Type */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Offer Name</label>
-          <input type="text" name="name" id="name" value={formData.name || ''} onChange={handleChange} className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required />
+          <input type="text" name="name" id="name" value={formData.name || ''} onChange={handleChange} className={inputClass} required />
         </div>
         <div>
           <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">Offer Type</label>
-          <select name="type" id="type" value={formData.type || 'product'} onChange={handleChange} className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+          <select name="type" id="type" value={formData.type || 'product'} onChange={handleChange} className={inputClass}>
             <option value="product">Product Specific</option>
             <option value="category">Category Specific</option>
             <option value="store">Store Wide</option>
             <option value="conditional">Conditional</option>
+            <option value="bogo">BOGO (Buy One Get One)</option>
           </select>
         </div>
       </div>
 
-      {/* Product IDs */}
-      {(formData.type === 'product') && (
+      {/* BOGO Specific Field */}
+      {formData.type === 'bogo' && (
         <div>
-          <label htmlFor="productIds" className="block text-sm font-medium text-gray-700 mb-1">Product IDs (comma-separated)</label>
-          <input type="text" name="productIds" id="productIds" value={(formData.productIds || []).join(', ')} onChange={handleChange} className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
-        </div>
-      )}
-      {/* Category IDs */}
-      {(formData.type === 'category') && (
-        <div>
-          <label htmlFor="categoryIds" className="block text-sm font-medium text-gray-700 mb-1">Category IDs (comma-separated)</label>
-          <input type="text" name="categoryIds" id="categoryIds" value={(formData.categoryIds || []).join(', ')} onChange={handleChange} className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+          <label htmlFor="bogoGetProductId" className="block text-sm font-medium text-gray-700 mb-1">BOGO - Get Product ID (Enter ID of free product)</label>
+          <input type="text" name="bogoGetProductId" id="bogoGetProductId" value={formData.bogoGetProductId || ''} onChange={handleChange} className={inputClass} placeholder="e.g., product_xyz123" />
         </div>
       )}
 
-      {/* Discount Fields */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Product IDs (Conditional) */}
+      {(formData.type === 'product' || formData.type === 'bogo' /* BOGO might also be product specific for the "buy" part */) && (
         <div>
-          <label htmlFor="discountPercent" className="block text-sm font-medium text-gray-700 mb-1">Discount Percent (%)</label>
-          <input type="number" name="discountPercent" id="discountPercent" value={formData.discountPercent === undefined ? '' : formData.discountPercent} onChange={handleChange} placeholder="e.g., 10" className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+          <label htmlFor="productIds" className="block text-sm font-medium text-gray-700 mb-1">
+            {formData.type === 'bogo' ? 'Buy Product IDs (comma-separated)' : 'Product IDs (comma-separated)'}
+          </label>
+          <input type="text" name="productIds" id="productIds" value={(formData.productIds || []).join(', ')} onChange={handleChange} className={inputClass} />
         </div>
+      )}
+      {/* Category IDs (Conditional) */}
+      {formData.type === 'category' && (
         <div>
-          <label htmlFor="discountAmount" className="block text-sm font-medium text-gray-700 mb-1">Discount Amount ($)</label>
-          <input type="number" name="discountAmount" id="discountAmount" value={formData.discountAmount === undefined ? '' : formData.discountAmount} onChange={handleChange} placeholder="e.g., 5.00" step="0.01" className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+          <label htmlFor="categoryIds" className="block text-sm font-medium text-gray-700 mb-1">Category IDs (comma-separated)</label>
+          <input type="text" name="categoryIds" id="categoryIds" value={(formData.categoryIds || []).join(', ')} onChange={handleChange} className={inputClass} />
         </div>
-      </div>
+      )}
+
+      {/* Discount Fields (Not shown for BOGO, as value is implicit) */}
+      {formData.type !== 'bogo' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label htmlFor="discountPercent" className="block text-sm font-medium text-gray-700 mb-1">Discount Percent (%)</label>
+            <input type="number" name="discountPercent" id="discountPercent" value={formData.discountPercent === undefined ? '' : formData.discountPercent} onChange={handleChange} placeholder="e.g., 10" className={inputClass} />
+          </div>
+          <div>
+            <label htmlFor="discountAmount" className="block text-sm font-medium text-gray-700 mb-1">Discount Amount ($)</label>
+            <input type="number" name="discountAmount" id="discountAmount" value={formData.discountAmount === undefined ? '' : formData.discountAmount} onChange={handleChange} placeholder="e.g., 5.00" step="0.01" className={inputClass} />
+          </div>
+        </div>
+      )}
       
       {/* Conditional Fields */}
-      {(formData.type === 'conditional') && (
+      {formData.type === 'conditional' && (
           <div>
             <label htmlFor="condition.cartValueGreaterThan" className="block text-sm font-medium text-gray-700 mb-1">Condition: Cart Value Greater Than ($)</label>
             <input 
@@ -445,22 +476,49 @@ const OfferForm: React.FC<OfferFormProps> = ({ initialData, onSubmit, onCancel }
                 value={formData.condition?.cartValueGreaterThan === undefined ? '' : formData.condition.cartValueGreaterThan} 
                 onChange={handleChange} 
                 placeholder="e.g., 100" 
-                className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" 
+                className={inputClass} 
             />
           </div>
       )}
+      
+      {/* Minimum Purchase Amount */}
+      <div>
+        <label htmlFor="minimumPurchaseAmount" className="block text-sm font-medium text-gray-700 mb-1">Minimum Purchase Amount (optional)</label>
+        <input type="number" name="minimumPurchaseAmount" id="minimumPurchaseAmount" value={formData.minimumPurchaseAmount === undefined ? '' : formData.minimumPurchaseAmount} onChange={handleChange} placeholder="e.g., 50" step="0.01" className={inputClass} />
+      </div>
 
       {/* Date Fields */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label htmlFor="validFrom" className="block text-sm font-medium text-gray-700 mb-1">Valid From</label>
-          {/* formData.validFrom is now string (YYYY-MM-DD) */}
-          <input type="date" name="validFrom" id="validFrom" value={formData.validFrom || ''} onChange={handleChange} className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required />
+          <input type="date" name="validFrom" id="validFrom" value={formData.validFrom || ''} onChange={handleChange} className={inputClass} required />
         </div>
         <div>
           <label htmlFor="validTill" className="block text-sm font-medium text-gray-700 mb-1">Valid Till</label>
-          {/* formData.validTill is now string (YYYY-MM-DD) */}
-          <input type="date" name="validTill" id="validTill" value={formData.validTill || ''} onChange={handleChange} className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required />
+          <input type="date" name="validTill" id="validTill" value={formData.validTill || ''} onChange={handleChange} className={inputClass} required />
+        </div>
+      </div>
+
+      {/* Usage Limits */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label htmlFor="usageLimits_totalRedemptions" className="block text-sm font-medium text-gray-700 mb-1">Total Redemptions Limit (optional)</label>
+          <input type="number" name="usageLimits_totalRedemptions" id="usageLimits_totalRedemptions" value={formData.usageLimits_totalRedemptions === undefined ? '' : formData.usageLimits_totalRedemptions} onChange={handleChange} placeholder="e.g., 1000" className={inputClass} />
+        </div>
+        <div>
+          <label htmlFor="usageLimits_perUser" className="block text-sm font-medium text-gray-700 mb-1">Per User Limit (optional)</label>
+          <input type="number" name="usageLimits_perUser" id="usageLimits_perUser" value={formData.usageLimits_perUser === undefined ? '' : formData.usageLimits_perUser} onChange={handleChange} placeholder="e.g., 1" className={inputClass} />
+        </div>
+      </div>
+      
+      {/* Offer Code */}
+      <div>
+        <label htmlFor="offerCode" className="block text-sm font-medium text-gray-700 mb-1">Offer Code / Coupon Code (optional)</label>
+        <div className="flex items-center">
+          <input type="text" name="offerCode" id="offerCode" value={formData.offerCode || ''} onChange={handleChange} className={inputClass + " flex-grow"} placeholder="e.g., SUMMER20" />
+          <button type="button" onClick={() => toast.info('Auto-generate (Placeholder)')} className="ml-2 py-2 px-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-400 hover:bg-gray-500">
+            Generate
+          </button>
         </div>
       </div>
 
@@ -468,9 +526,10 @@ const OfferForm: React.FC<OfferFormProps> = ({ initialData, onSubmit, onCancel }
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label htmlFor="priority" className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-          <input type="number" name="priority" id="priority" value={formData.priority === undefined ? '' : formData.priority} onChange={handleChange} placeholder="e.g., 0 (highest)" className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required />
+          <input type="number" name="priority" id="priority" value={formData.priority === undefined ? '' : formData.priority} onChange={handleChange} placeholder="e.g., 0 (highest)" className={inputClass} required />
+          <p className="text-xs text-gray-500 mt-1">Higher numbers apply first (e.g., 10 applies before 1).</p>
         </div>
-        <div className="flex items-center mt-6">
+        <div className="flex items-center mt-6 md:mt-8"> {/* Adjusted margin for alignment */}
             <input type="checkbox" name="enabled" id="enabled" checked={formData.enabled || false} onChange={handleChange} className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
             <label htmlFor="enabled" className="ml-2 block text-sm font-medium text-gray-700">Enabled</label>
         </div>

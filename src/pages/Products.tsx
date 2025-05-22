@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout';
 import ProductCard from '../components/products/ProductCard';
@@ -14,11 +14,11 @@ import ProductCardSkeleton from '../components/products/ProductCardSkeleton';
 import { Button } from '../components/ui/button';
 import { 
   Loader2, 
+  Filter,
+  X,
   ChevronDown, 
   ArrowDownUp, 
   CheckSquare, 
-  Filter,
-  X,
   ArrowLeft
 } from 'lucide-react';
 import {
@@ -30,6 +30,7 @@ import {
   SheetClose,
   SheetFooter,
 } from "../components/ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 // Helper function to map service product to local client product
 const mapServiceProductToLocalProduct = (serviceProduct: ServiceProduct): LocalProduct => {
@@ -55,11 +56,13 @@ const mapServiceProductToLocalProduct = (serviceProduct: ServiceProduct): LocalP
   };
 };
 
-const PRODUCTS_PER_PAGE = 16; // Increased number of products per page
+const PRODUCTS_PER_PAGE = 16;
 
-// Sort options for Flipkart style
-const sortOptions = [
-  { value: 'relevance', label: 'Popularity' },
+// Sort options (merged: using feature branch's options for Select)
+const sortOptionsConfig = [
+  { value: 'relevance', label: 'Popularity' }, // Kept from HEAD for potential different display
+  { value: 'name-asc', label: 'Name (A-Z)' },
+  { value: 'name-desc', label: 'Name (Z-A)' },
   { value: 'price-low', label: 'Price -- Low to High' },
   { value: 'price-high', label: 'Price -- High to Low' },
   { value: 'newest', label: 'Newest First' },
@@ -67,17 +70,18 @@ const sortOptions = [
 
 const Products = () => {
   const [searchParams] = useSearchParams();
-  const [filteredProducts, setFilteredProducts] = useState<LocalProduct[]>([]);
+  const [allFetchedProducts, setAllFetchedProducts] = useState<LocalProduct[]>([]); // Store all products from fetch
+  const [displayedProducts, setDisplayedProducts] = useState<LocalProduct[]>([]); // Products to render after sort/filter
   const [loading, setLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
   const [lastVisibleDoc, setLastVisibleDoc] = useState<ClientDocumentSnapshot | undefined>(undefined);
   const [hasNextPage, setHasNextPage] = useState(true);
-  const [sortBy, setSortBy] = useState('relevance');
+  const [sortOption, setSortOption] = useState('relevance'); // Default sort
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   
-  // Mocked or simplified filter options
+  // Mocked or simplified filter options (from HEAD, but ideally from backend)
   const [categories, setCategories] = useState<string[]>([
     'Electronics', 'Clothing', 'Home & Garden', 'Books', 'Sports', 'Toys',
     'Beauty', 'Grocery', 'Appliances', 'Furniture'
@@ -85,7 +89,7 @@ const Products = () => {
   const [tags, setTags] = useState<string[]>([
     'New', 'Bestseller', 'Sale', 'Trending', 'Premium'
   ]);
-  const [maxPrice, setMaxPrice] = useState(100000);
+  const [maxPrice, setMaxPrice] = useState(100000); 
   
   const categoryParam = searchParams.get('category');
   const searchQueryParam = searchParams.get('search');
@@ -95,7 +99,7 @@ const Products = () => {
       setIsLoadingMore(true);
     } else {
       setLoading(true);
-      setFilteredProducts([]);
+      setAllFetchedProducts([]);
       setLastVisibleDoc(undefined);
       setHasNextPage(true);
     }
@@ -117,19 +121,17 @@ const Products = () => {
       const response = await fetchServiceProducts(fetchOptions);
       let clientProducts = response.products.map(mapServiceProductToLocalProduct);
       
+      // Client-side search query filtering (from HEAD)
       if (searchQueryParam) {
         const lowerQuery = searchQueryParam.toLowerCase();
         clientProducts = clientProducts.filter(p => 
           p.name.toLowerCase().includes(lowerQuery) || 
-          p.description.toLowerCase().includes(lowerQuery) ||
+          (p.description && p.description.toLowerCase().includes(lowerQuery)) || // Added check for p.description
           (p.tags && p.tags.some(t => t.toLowerCase().includes(lowerQuery)))
         );
       }
-      
-      // Apply client-side sorting
-      clientProducts = sortProducts(clientProducts, sortBy);
-      
-      setFilteredProducts(prevProducts => isLoadMore ? [...prevProducts, ...clientProducts] : clientProducts);
+            
+      setAllFetchedProducts(prevProducts => isLoadMore ? [...prevProducts, ...clientProducts] : clientProducts);
       setLastVisibleDoc(response.lastVisible);
       setHasNextPage(!!response.lastVisible && response.products.length === PRODUCTS_PER_PAGE);
 
@@ -144,53 +146,52 @@ const Products = () => {
         setHasFetchedOnce(true);
       }
     }
-  }, [categoryParam, searchQueryParam, lastVisibleDoc, sortBy]);
+  }, [categoryParam, searchQueryParam, lastVisibleDoc]);
 
-  // Sort products function
-  const sortProducts = (products: LocalProduct[], sortOption: string) => {
-    const sortedProducts = [...products];
-    
-    switch (sortOption) {
-      case 'price-low':
-        sortedProducts.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-high':
-        sortedProducts.sort((a, b) => b.price - a.price);
-        break;
-      case 'newest':
-        sortedProducts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        break;
-      default: // 'relevance' or 'popularity'
-        sortedProducts.sort((a, b) => b.featured - a.featured);
-        break;
-    }
-    
-    return sortedProducts;
-  };
-
+  // Initial fetch (combined logic)
   useEffect(() => {
     fetchProductsCallback({});
-  }, [categoryParam, searchQueryParam, fetchProductsCallback]);
+  }, [categoryParam, searchQueryParam, fetchProductsCallback]); // fetchProductsCallback is stable due to useCallback
 
-  // Re-sort products when sort option changes
+  // Sorting logic (from feature branch, adapted)
   useEffect(() => {
-    if (filteredProducts.length > 0 && hasFetchedOnce) {
-      const sortedProducts = sortProducts(filteredProducts, sortBy);
-      setFilteredProducts(sortedProducts);
+    let productsToDisplay = [...allFetchedProducts];
+    switch (sortOption) {
+      case 'name-asc':
+        productsToDisplay.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'name-desc':
+        productsToDisplay.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case 'price-low':
+        productsToDisplay.sort((a, b) => a.price - b.price);
+        break;
+      case 'price-high':
+        productsToDisplay.sort((a, b) => b.price - a.price);
+        break;
+      case 'newest':
+        productsToDisplay.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+      case 'relevance': // 'relevance' or 'popularity' (from HEAD)
+      default:
+        productsToDisplay.sort((a, b) => (b.featured || 0) - (a.featured || 0)); // Added || 0 for safety
+        break;
     }
-  }, [sortBy, filteredProducts, hasFetchedOnce]);
+    setDisplayedProducts(productsToDisplay);
+  }, [sortOption, allFetchedProducts]);
   
   const handleFilterChange = useCallback(async (filterValues: FilterOptions) => {
+    // This needs to re-fetch with filters if backend supports it
+    // For now, it re-fetches all and then client-side sort/search applies.
+    // If filters were backend, fetchProductsCallback would take more filter options.
     const options: ServiceGetAllProductsOptions = { isEnabled: true };
-
     if (filterValues.categories.length > 0) {
-      options.categoryId = filterValues.categories[0];
+      options.categoryId = filterValues.categories[0]; // Example: using first category
     }
-    if (filterValues.priceRange) {
-      options.minPrice = filterValues.priceRange[0];
-      options.maxPrice = filterValues.priceRange[1];
-    }
-    
+    // Add price range to options if your service supports it
+    // options.minPrice = filterValues.priceRange[0];
+    // options.maxPrice = filterValues.priceRange[1];
+
     await fetchProductsCallback(options, false);
   }, [fetchProductsCallback]);
   
@@ -212,21 +213,21 @@ const Products = () => {
   return (
     <MainLayout>
       <div className="bg-flipkart-gray-background min-h-screen">
-        {/* Breadcrumb - hidden on mobile */}
+        {/* Breadcrumb (from HEAD) */}
         <div className="hidden md:block container pt-3 pb-1">
           <div className="text-flipkart-small text-flipkart-gray-secondary-text">
             Home {categoryParam && '>'} {categoryParam && <span className="text-flipkart-blue">{categoryParam}</span>}
           </div>
         </div>
         
-        {/* Title Bar */}
+        {/* Title Bar (from HEAD) */}
         <div className="bg-white p-4 shadow-sm mb-3">
           <div className="container">
             <div className="flex items-center justify-between">
               <h1 className="text-flipkart-header-md font-medium">
                 {getTitle()}
                 <span className="text-flipkart-small text-flipkart-gray-secondary-text ml-2">
-                  ({filteredProducts.length} {filteredProducts.length === 1 ? 'Product' : 'Products'})
+                  ({displayedProducts.length} {displayedProducts.length === 1 ? 'Product' : 'Products'})
                 </span>
               </h1>
             </div>
@@ -235,8 +236,22 @@ const Products = () => {
         
         <div className="container pb-6">
           <div className="flex flex-col md:flex-row gap-3">
-            {/* Desktop Filter Sidebar */}
+            {/* Desktop Filter Sidebar (from HEAD) */}
             <div className="hidden md:block w-1/4">
+               {/* Sorting Dropdown (from feature branch, adapted) */}
+              <div className="mb-6 bg-white p-4 rounded-lg shadow">
+                <label htmlFor="sort-options" className="block text-sm font-medium text-gray-700 mb-2">Sort by</label>
+                <Select value={sortOption} onValueChange={setSortOption}>
+                  <SelectTrigger id="sort-options" className="w-full">
+                    <SelectValue placeholder="Select sort option" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sortOptionsConfig.map(option => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <ProductFilter 
                 categories={categories}
                 tags={tags}
@@ -252,26 +267,28 @@ const Products = () => {
               />
             </div>
             
-            {/* Product Listing Area */}
+            {/* Product Listing Area (Main structure from HEAD) */}
             <div className="flex-1">
-              {/* Sort Bar */}
+              {/* Sort Bar - Mobile/alternative sort (can be kept or removed if Select is primary) */}
+              {/* This is the button-based sort from HEAD. You might choose to remove it if the Select dropdown is preferred on desktop too. */}
               <div className="bg-white p-3 mb-3 shadow-sm flex items-center justify-between">
-                <div className="font-medium text-flipkart-body">Sort By</div>
-                <div className="flex gap-3">
-                  {sortOptions.map(option => (
+                <div className="font-medium text-flipkart-body">Sort By (Alt)</div> 
+                <div className="flex gap-3 flex-wrap">
+                  {sortOptionsConfig.map(option => (
                     <button
                       key={option.value}
-                      className={`px-3 py-1 text-flipkart-body ${sortBy === option.value 
-                        ? 'text-flipkart-blue font-medium' 
+                      className={`px-3 py-1 text-flipkart-body ${
+                        sortOption === option.value 
+                        ? 'text-flipkart-blue font-medium border-b-2 border-flipkart-blue' 
                         : 'text-flipkart-gray-primary-text'}`}
-                      onClick={() => setSortBy(option.value)}
+                      onClick={() => setSortOption(option.value)}
                     >
                       {option.label}
                     </button>
                   ))}
                 </div>
                 
-                {/* Mobile Filter Button */}
+                {/* Mobile Filter Button (from HEAD) */}
                 <div className="md:hidden">
                   <Sheet open={showMobileFilters} onOpenChange={setShowMobileFilters}>
                     <SheetTrigger asChild>
@@ -287,7 +304,21 @@ const Products = () => {
                         </SheetClose>
                         <SheetTitle className="ml-8 text-flipkart-header-sm">Filters</SheetTitle>
                       </SheetHeader>
-                      <div className="overflow-y-auto h-[calc(100%-7rem)]">
+                      <div className="overflow-y-auto h-[calc(100%-7rem)] p-4">
+                        {/* Mobile Sorting Dropdown */}
+                        <div className="mb-4">
+                          <label htmlFor="sort-options-mobile" className="block text-sm font-medium text-gray-700 mb-1">Sort by</label>
+                          <Select value={sortOption} onValueChange={setSortOption}>
+                            <SelectTrigger id="sort-options-mobile" className="w-full">
+                              <SelectValue placeholder="Select sort option" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sortOptionsConfig.map(option => (
+                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <ProductFilter
                           categories={categories}
                           tags={tags}
@@ -302,10 +333,10 @@ const Products = () => {
                           }}
                         />
                       </div>
-                      <SheetFooter className="border-t border-flipkart-gray-border h-14 px-4 flex justify-between">
-                        <Button variant="outline" size="lg" className="w-full">RESET</Button>
+                      <SheetFooter className="border-t border-flipkart-gray-border h-14 px-4 flex justify-between items-center">
+                        <Button variant="outline" size="lg" className="w-1/2" onClick={() => { /* TODO: Reset filters */ }}>RESET</Button>
                         <SheetClose asChild>
-                          <Button size="lg" className="w-full bg-flipkart-blue hover:bg-flipkart-blue/90">APPLY</Button>
+                          <Button size="lg" className="w-1/2 bg-flipkart-blue hover:bg-flipkart-blue/90" onClick={() => setShowMobileFilters(false)}>APPLY</Button>
                         </SheetClose>
                       </SheetFooter>
                     </SheetContent>
@@ -313,7 +344,7 @@ const Products = () => {
                 </div>
               </div>
               
-              {/* Products Grid */}
+              {/* Products Grid (from HEAD, uses displayedProducts) */}
               <div className="bg-white shadow-sm p-3">
                 {loading && !hasFetchedOnce ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
@@ -324,13 +355,13 @@ const Products = () => {
                     <h2 className="text-flipkart-header-md text-red-500 mb-2">Something went wrong</h2>
                     <p className="text-flipkart-body text-flipkart-gray-secondary-text mb-4">{error}</p>
                     <Button 
-                      onClick={() => fetchProductsCallback()} 
+                      onClick={() => fetchProductsCallback({}, false)} 
                       className="bg-flipkart-blue hover:bg-flipkart-blue/90"
                     >
                       Try Again
                     </Button>
                   </div>
-                ) : filteredProducts.length === 0 && !loading ? (
+                ) : displayedProducts.length === 0 && !loading ? (
                   <div className="text-center py-10">
                     <p className="text-flipkart-header-sm text-flipkart-gray-primary-text">
                       No products found matching your criteria.
@@ -338,14 +369,14 @@ const Products = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
-                    {filteredProducts.map(product => (
+                    {displayedProducts.map(product => (
                       <ProductCard key={product.id} product={product} />
                     ))}
                   </div>
                 )}
                 
-                {/* Load More Button */}
-                {hasNextPage && !loading && filteredProducts.length > 0 && (
+                {/* Load More Button (from HEAD) */}
+                {hasNextPage && !loading && displayedProducts.length > 0 && (
                   <div className="mt-6 text-center">
                     <Button 
                       onClick={handleLoadMore} 

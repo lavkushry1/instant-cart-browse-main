@@ -1,5 +1,3 @@
-// functions/src/api/cart.functions.ts
-
 import * as functions from 'firebase-functions/v1';
 import {
   getUserCartBE,

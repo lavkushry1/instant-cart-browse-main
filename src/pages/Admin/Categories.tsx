@@ -65,17 +65,56 @@ const CategoryForm: React.FC<{
     isEditMode: boolean;
 }> = ({ category, onSave, onClose, availableCategories, isEditMode }) => {
     const [name, setName] = useState(category?.name || '');
+    const [slug, setSlug] = useState(category?.slug || '');
     const [description, setDescription] = useState(category?.description || '');
     const [imageUrl, setImageUrl] = useState(category?.imageUrl || '');
     const [parentId, setParentId] = useState(category?.parentId || null);
     const [isEnabled, setIsEnabled] = useState(category?.isEnabled === undefined ? true : category.isEnabled);
+    const [seoTitle, setSeoTitle] = useState(category?.seoTitle || '');
+    const [seoDescription, setSeoDescription] = useState(category?.seoDescription || '');
     const [isSavingForm, setIsSavingForm] = useState(false);
+
+    // Client-side slug generation helper
+    const generateSlug = (value: string): string => {
+      if (!value) return '';
+      return value
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')       // Replace spaces with -
+        .replace(/[^\w-]+/g, '')    // Remove all non-word chars
+        .replace(/--+/g, '-')       // Replace multiple - with single -
+        .replace(/^-+/, '')          // Trim - from start of text
+        .replace(/-+$/, '');         // Trim - from end of text
+    };
+
+    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newName = e.target.value;
+      setName(newName);
+      if (!slug.trim() || (category?.name === slug)) { // Auto-generate slug if it's empty or was derived from the old name
+        setSlug(generateSlug(newName));
+      }
+    };
+    
+    const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSlug(e.target.value); // Allow manual override of slug
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) { toast.error("Category name is required."); return; }
         setIsSavingForm(true);
-        const dataToSave = { name, description, imageUrl, parentId: parentId === '' ? null : parentId, isEnabled };
+        const finalSlug = slug.trim() ? slug : generateSlug(name);
+        const dataToSave = { 
+          name, 
+          slug: finalSlug,
+          description, 
+          imageUrl, 
+          parentId: parentId === '' ? null : parentId, 
+          isEnabled,
+          seoTitle,
+          seoDescription 
+        };
         
         if (isEditMode && category?.id) {
             await onSave(dataToSave as CategoryUpdateData, category.id);
@@ -87,9 +126,12 @@ const CategoryForm: React.FC<{
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
-            <div><Label htmlFor="cat-name">Name</Label><Input id="cat-name" value={name} onChange={e => setName(e.target.value)} required /></div>
+            <div><Label htmlFor="cat-name">Name</Label><Input id="cat-name" value={name} onChange={handleNameChange} required /></div>
+            <div><Label htmlFor="cat-slug">Slug (auto-generated if empty)</Label><Input id="cat-slug" value={slug} onChange={handleSlugChange} placeholder="category-slug" /></div>
             <div><Label htmlFor="cat-desc">Description</Label><Textarea id="cat-desc" value={description} onChange={e => setDescription(e.target.value)} /></div>
             <div><Label htmlFor="cat-img">Image URL</Label><Input id="cat-img" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://example.com/image.png" /></div>
+            <div><Label htmlFor="cat-seo-title">SEO Title (optional)</Label><Input id="cat-seo-title" value={seoTitle} onChange={e => setSeoTitle(e.target.value)} /></div>
+            <div><Label htmlFor="cat-seo-desc">SEO Description (optional)</Label><Textarea id="cat-seo-desc" value={seoDescription} onChange={e => setSeoDescription(e.target.value)} /></div>
             <div><Label htmlFor="cat-parent">Parent Category</Label>
                 <Select value={parentId || ''} onValueChange={(value) => setParentId(value === '' ? null : value)}>
                     <SelectTrigger><SelectValue placeholder="Select parent (optional)" /></SelectTrigger>
@@ -180,8 +222,8 @@ const AdminCategories = () => {
             <TableCell>{cat.slug}</TableCell>
             <TableCell className="text-center"><Badge variant={cat.isEnabled ? 'default' : 'outline'}>{cat.isEnabled ? 'Active' : 'Disabled'}</Badge></TableCell>
             <TableCell className="text-right">
-              <Button variant="ghost" size="sm" onClick={() => openFormForEdit(cat)}><Edit size={16}/></Button>
-              <Button variant="ghost" size="sm" className="text-red-500" onClick={() => setCategoryToDelete(cat)}><Trash2 size={16}/></Button>
+              <Button variant="ghost" size="sm" onClick={() => openFormForEdit(cat)} aria-label="Edit category"><Edit size={16}/></Button>
+              <Button variant="ghost" size="sm" className="text-red-500" onClick={() => setCategoryToDelete(cat)} aria-label="Delete category"><Trash2 size={16}/></Button>
             </TableCell>
           </TableRow>
           {renderCategories(cats, cat.id, level + 1)}

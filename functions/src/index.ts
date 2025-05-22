@@ -1,5 +1,3 @@
-// functions/src/index.ts
-
 console.log("Firebase Functions index.ts: Initializing and exporting function groups...");
 
 // Import and re-export function groups

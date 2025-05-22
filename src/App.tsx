@@ -1,6 +1,6 @@
-import { Toaster } from "@/components/ui/toast";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "./components/ui/toast";
+import { Toaster as Sonner } from "./components/ui/sonner";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { AuthProvider } from "./hooks/AuthProvider";
@@ -26,9 +26,12 @@ import NotFound from "./pages/NotFound";
 import ForgotPassword from './pages/ForgotPassword';
 import WishlistPage from './pages/WishlistPage';
 import ProductListingPage from './pages/ProductListingPage'; // New PLP component
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsAndConditionsPage from './pages/TermsAndConditionsPage';
+import OrderTrackingPage from './pages/OrderTrackingPage';
 
 // Admin Pages (Consider lazy loading for these if not already)
-import AdminLayout from './components/layout/AdminLayout'; // Assuming AdminLayout handles its own auth
+import AdminLayout from './components/layout/AdminLayout';
 import AdminDashboard from "./pages/Admin/Dashboard";
 import AdminProducts from "./pages/Admin/Products";
 import ProductForm from "./pages/Admin/ProductForm";
@@ -42,6 +45,7 @@ import SEOSettings from "./pages/Admin/SEOSettings";
 import ThemeSettings from "./pages/Admin/ThemeSettings";
 import TrackingSettings from "./pages/Admin/TrackingSettings";
 import AdminSettings from "./pages/Admin/Settings";
+import AdminReviews from "./pages/Admin/Reviews"; // Import AdminReviews
 
 // Suspense fallback
 const LoadingFallback = () => <div className="p-6 text-center"><p>Loading page...</p></div>; 
@@ -76,7 +80,7 @@ const App = () => (
                       <Route path="/register" element={<Register />} />
                       <Route 
                         path="/account" 
-                        element={ <ProtectedRoute> <Account /> </ProtectedRoute> } 
+                        element={<ProtectedRoute><Account /></ProtectedRoute>} 
                       />
                       <Route path="/forgot-password" element={<ForgotPassword />} />
                       <Route path="/deals" element={<Products />} /> {/* Assuming /deals shows all products or a specific category */}
@@ -84,6 +88,9 @@ const App = () => (
                         path="/wishlist" 
                         element={<ProtectedRoute><WishlistPage /></ProtectedRoute>}
                       />
+                      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                      <Route path="/terms" element={<TermsAndConditionsPage />} />
+                      <Route path="/order-tracking/:orderId" element={<ProtectedRoute><OrderTrackingPage /></ProtectedRoute>} />
                       
                       {/* Admin Routes - Assuming AdminLayout handles auth protection for its children */}
                       <Route path="/admin" element={<AdminLayout />}>
@@ -101,6 +108,7 @@ const App = () => (
                         <Route path="theme" element={<ThemeSettings />} />
                         <Route path="tracking" element={<TrackingSettings />} />
                         <Route path="settings" element={<AdminSettings />} />
+                        <Route path="reviews" element={<AdminReviews />} /> 
                       </Route>
                       
                       {/* Not Found */}
