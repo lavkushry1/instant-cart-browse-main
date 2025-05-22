@@ -1,6 +1,6 @@
 import { ReactNode, useEffect } from 'react';
 import Navbar from './Navbar';
-import { Footer } from './Footer';
+import Footer from './FooterNew';
 import MobileFooterNav from '@/components/MobileFooterNav';
 import { useLocation } from 'react-router-dom';
 import { FloatingSupportButton } from '@/components/FloatingSupportButton';

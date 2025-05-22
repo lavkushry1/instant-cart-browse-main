@@ -1,8 +1,8 @@
-import { HomeBanner } from '@/components/marketing/HomeBanner';
-import { TopCategoriesShowcase } from '@/components/categories/CategoryShowcase';
-import { ProductShowcase } from '@/components/products/ProductShowcase';
+import { HomeBanner } from '../components/marketing/HomeBanner';
+import { TopCategoriesShowcase } from '../components/categories/CategoryShowcase';
+import { ProductShowcase } from '../components/products/ProductShowcase';
 import { useEffect, useState } from 'react';
-import { Product } from '@/types/product';
+import { Product } from '../types/product';
 
 // Mock data for product showcase
 const mockProducts1: Product[] = [

@@ -3,25 +3,25 @@ import { Link } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout';
 import { HeroCarousel } from '@/components/marketing/HeroCarousel';
 import ProductCard from '@/components/products/ProductCard';
+import { FlipkartDealsSection } from '@/components/marketing/FlipkartDealsSection';
 import { Product as LocalProductType } from '@/types/product';
-import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
-import { CurrencyDemo } from '@/components/currency/CurrencyDemo';
 import {
   getProducts as fetchServiceProducts,
   Product as ServiceProduct 
 } from '@/services/productService';
 
-// Mock categories for now, replace with dynamic fetching later
-const mockCategories = [
-  { id: '1', slug: 'electronics', name: 'Electronics', icon: '📱' },
-  { id: '2', slug: 'fashion', name: 'Fashion', icon: '👕' },
-  { id: '3', slug: 'appliances', name: 'Appliances', icon: '🏠' },
-  { id: '4', slug: 'beauty', name: 'Beauty', icon: '💄' },
-  { id: '5', slug: 'home', name: 'Home & Furniture', icon: '🛋️' },
-  { id: '6', slug: 'grocery', name: 'Grocery', icon: '🛒' },
-  { id: '7', slug: 'toys', name: 'Toys', icon: '🧸' },
-  { id: '8', slug: 'sports', name: 'Sports', icon: '⚽' },
+// Categories with image URLs for better display
+const homeCategories = [
+  { id: '1', slug: 'mobiles', name: 'Mobiles', image: 'https://rukminim1.flixcart.com/flap/128/128/image/22fddf3c7da4c4f4.png?q=100' },
+  { id: '2', slug: 'fashion', name: 'Fashion', image: 'https://rukminim1.flixcart.com/flap/128/128/image/c12afc017e6f24cb.png?q=100' },
+  { id: '3', slug: 'electronics', name: 'Electronics', image: 'https://rukminim1.flixcart.com/flap/128/128/image/69c6589653afdb9a.png?q=100' },
+  { id: '4', slug: 'home', name: 'Home & Furniture', image: 'https://rukminim1.flixcart.com/flap/128/128/image/ab7e2b022a4587dd.jpg?q=100' },
+  { id: '5', slug: 'appliances', name: 'Appliances', image: 'https://rukminim1.flixcart.com/flap/128/128/image/0ff199d1bd27eb98.png?q=100' },
+  { id: '6', slug: 'grocery', name: 'Grocery', image: 'https://rukminim1.flixcart.com/flap/128/128/image/29327f40e9c4d26b.png?q=100' },
+  { id: '7', slug: 'toys', name: 'Toys & Baby', image: 'https://rukminim1.flixcart.com/flap/128/128/image/dff3f7adcf3a90c6.png?q=100' },
+  { id: '8', slug: 'travel', name: 'Travel', image: 'https://rukminim1.flixcart.com/flap/128/128/image/71050627a56b4693.png?q=100' },
+  { id: '9', slug: 'beauty', name: 'Beauty & Personal Care', image: 'https://rukminim1.flixcart.com/flap/128/128/image/db4365bf1389f3f9.jpg?q=100' },
 ];
 
 const mapServiceProductToLocalHomeProduct = (serviceProduct: ServiceProduct): LocalProductType => {
@@ -70,24 +70,29 @@ const Home = () => {
   return (
     <MainLayout>
       {/* Hero Carousel */}
-      <section className="mb-4">
+      <section className="mb-2">
         <HeroCarousel />
       </section>
       
-      {/* Category Icons Grid */}
-      <section className="py-4 bg-white">
+      {/* Category Icons Grid - Flipkart Style */}
+      <section className="bg-white py-3 mb-2 shadow-sm">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-4 md:grid-cols-8 gap-4">
-            {mockCategories.map((category) => (
+          <div className="grid grid-cols-4 md:grid-cols-9 gap-2">
+            {homeCategories.map((category) => (
               <Link 
                 key={category.id} 
                 to={`/category/${category.slug}`}
-                className="flex flex-col items-center p-2"
+                className="flex flex-col items-center p-1 text-center"
               >
-                <div className="w-16 h-16 rounded-full bg-flipkart-gray-background flex items-center justify-center mb-2">
-                  <span className="text-2xl">{category.icon}</span>
+                <div className="w-14 h-14 md:w-16 md:h-16 mb-1 flex items-center justify-center">
+                  <img 
+                    src={category.image} 
+                    alt={category.name} 
+                    className="max-w-full max-h-full object-contain"
+                    loading="lazy"
+                  />
                 </div>
-                <span className="text-flipkart-small text-center text-flipkart-gray-primary-text">
+                <span className="text-xs md:text-sm text-center line-clamp-2 h-8">
                   {category.name}
                 </span>
               </Link>
@@ -96,79 +101,69 @@ const Home = () => {
         </div>
       </section>
       
-      {/* Deal Sections & Product Carousels */}
-      <section className="py-4 bg-white mt-4">
+      {/* Top Offers Section - Flipkart Style */}
+      <FlipkartDealsSection
+        title="Top Offers"
+        subtitle="Best Deals of the Day"
+        viewAllLink="/deals"
+        products={featuredProducts.filter(p => p.discount > 10)}
+        loading={loadingFeatured}
+        imageUrl="/public/images/flipkart-plus-icon.png"
+      />
+      
+      {/* Banner Grid - Flipkart Style */}
+      <section className="mb-2">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-flipkart-header-md">Top Offers</h2>
-            <Link to="/products" className="text-flipkart-blue text-flipkart-body flex items-center">
-              <span>VIEW ALL</span>
-              <ArrowRight className="ml-1 h-4 w-4" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <Link to="/category/electronics" className="block">
+              <img 
+                src="https://rukminim1.flixcart.com/fk-p-flap/520/280/image/57438dbd5dcd1e34.jpg?q=20" 
+                alt="Electronics Sale" 
+                className="w-full h-auto rounded-sm"
+              />
             </Link>
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {loadingFeatured ? (
-              // Loading skeleton
-              Array(5).fill(0).map((_, index) => (
-                <div key={index} className="bg-white p-2 border border-flipkart-gray-border">
-                  <div className="aspect-square bg-gray-100 mb-2 animate-pulse"></div>
-                  <div className="h-4 bg-gray-100 mb-2 animate-pulse"></div>
-                  <div className="h-4 bg-gray-100 w-1/2 animate-pulse"></div>
-                </div>
-              ))
-            ) : (
-              // Product cards
-              featuredProducts.slice(0, 5).map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))
-            )}
+            <Link to="/category/home" className="block">
+              <img 
+                src="https://rukminim1.flixcart.com/fk-p-flap/520/280/image/1001a93eaddd2880.jpg?q=20" 
+                alt="Home Decor" 
+                className="w-full h-auto rounded-sm"
+              />
+            </Link>
           </div>
         </div>
       </section>
       
-      {/* Banner Grid */}
-      <section className="py-4 bg-white mt-4">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-flipkart-gray-background h-40 md:h-60 rounded flex items-center justify-center">
-              <span className="text-flipkart-header-md">Banner 1</span>
-            </div>
-            <div className="bg-flipkart-gray-background h-40 md:h-60 rounded flex items-center justify-center">
-              <span className="text-flipkart-header-md">Banner 2</span>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Best Sellers Section */}
+      <FlipkartDealsSection
+        title="Best Sellers"
+        viewAllLink="/products"
+        products={featuredProducts.filter(p => p.featured === 1)}
+        loading={loadingFeatured}
+        bgColor="bg-white"
+      />
       
-      {/* Another Product Carousel */}
-      <section className="py-4 bg-white mt-4">
+      {/* New Arrivals Section */}
+      <FlipkartDealsSection
+        title="New Arrivals"
+        subtitle="Just Launched Products"
+        viewAllLink="/products/new"
+        products={featuredProducts.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ).slice(0, 5)}
+        loading={loadingFeatured}
+        bgColor="bg-white"
+      />
+      
+      {/* Full Width Banner */}
+      <section className="mb-2">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-flipkart-header-md">Best Sellers</h2>
-            <Link to="/products" className="text-flipkart-blue text-flipkart-body flex items-center">
-              <span>VIEW ALL</span>
-              <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {loadingFeatured ? (
-              // Loading skeleton
-              Array(5).fill(0).map((_, index) => (
-                <div key={index} className="bg-white p-2 border border-flipkart-gray-border">
-                  <div className="aspect-square bg-gray-100 mb-2 animate-pulse"></div>
-                  <div className="h-4 bg-gray-100 mb-2 animate-pulse"></div>
-                  <div className="h-4 bg-gray-100 w-1/2 animate-pulse"></div>
-                </div>
-              ))
-            ) : (
-              // Product cards
-              featuredProducts.slice(0, 5).map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))
-            )}
-          </div>
+          <Link to="/sale" className="block">
+            <img 
+              src="https://rukminim1.flixcart.com/fk-p-flap/1600/140/image/d99c9ca6f9219e13.jpg?q=20" 
+              alt="Sale Banner" 
+              className="w-full h-auto rounded-sm"
+            />
+          </Link>
         </div>
       </section>
     </MainLayout>

@@ -1,32 +1,32 @@
 import { useCallback, useEffect, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import type { EmblaOptionsType } from 'embla-carousel';
+import type { EmblaOptionsType, EmblaCarouselType } from 'embla-carousel';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../ui/button';
 
-// Mock carousel images - in a real app, these would come from CMS/backend
+// Carousel images matching Flipkart's homepage carousel style
 const CAROUSEL_IMAGES = [
   {
     id: 1,
-    src: 'https://via.placeholder.com/1600x400/2874F0/FFFFFF?text=Flipkart+Sale',
-    alt: 'Flipkart Sale',
+    src: 'https://rukminim1.flixcart.com/fk-p-flap/1600/270/image/a2d45f82f7c5577e.jpg?q=20',
+    alt: 'Big Saving Days Are Back',
     href: '/sale'
   },
   {
     id: 2,
-    src: 'https://via.placeholder.com/1600x400/FB641B/FFFFFF?text=Electronics+Deals',
-    alt: 'Electronics Deals',
+    src: 'https://rukminim1.flixcart.com/fk-p-flap/1600/270/image/4010d71cc1711265.jpg?q=20',
+    alt: 'Electronics Sale',
     href: '/electronics'
   },
   {
     id: 3,
-    src: 'https://via.placeholder.com/1600x400/388E3C/FFFFFF?text=Fashion+Collection',
+    src: 'https://rukminim1.flixcart.com/fk-p-flap/1600/270/image/352e6f0f8034fab5.jpg?q=20',
     alt: 'Fashion Collection',
     href: '/fashion'
   },
   {
     id: 4,
-    src: 'https://via.placeholder.com/1600x400/FFE500/212121?text=Home+Appliances',
+    src: 'https://rukminim1.flixcart.com/fk-p-flap/1600/270/image/5df65ad101e18a8d.jpg?q=20',
     alt: 'Home Appliances',
     href: '/appliances'
   },
@@ -49,11 +49,11 @@ export const HeroCarousel = () => {
   const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
 
   // Initialize and cleanup
-  const onInit = useCallback((emblaApi: any) => {
+  const onInit = useCallback((emblaApi: EmblaCarouselType) => {
     setScrollSnaps(emblaApi.scrollSnapList());
   }, []);
 
-  const onSelect = useCallback((emblaApi: any) => {
+  const onSelect = useCallback((emblaApi: EmblaCarouselType) => {
     setSelectedIndex(emblaApi.selectedScrollSnap());
   }, []);
 

@@ -11,7 +11,7 @@ import {
   ClientDocumentSnapshot
 } from '../services/productService';
 import ProductCardSkeleton from '../components/products/ProductCardSkeleton';
-import { Button } from '@/components/ui/button';
+import { Button } from '../components/ui/button';
 import { 
   Loader2, 
   ChevronDown, 
@@ -29,7 +29,7 @@ import {
   SheetTrigger,
   SheetClose,
   SheetFooter,
-} from "@/components/ui/sheet";
+} from "../components/ui/sheet";
 
 // Helper function to map service product to local client product
 const mapServiceProductToLocalProduct = (serviceProduct: ServiceProduct): LocalProduct => {
@@ -178,7 +178,7 @@ const Products = () => {
       const sortedProducts = sortProducts(filteredProducts, sortBy);
       setFilteredProducts(sortedProducts);
     }
-  }, [sortBy]);
+  }, [sortBy, filteredProducts, hasFetchedOnce]);
   
   const handleFilterChange = useCallback(async (filterValues: FilterOptions) => {
     const options: ServiceGetAllProductsOptions = { isEnabled: true };

@@ -73,6 +73,7 @@ const CreditCardForm = ({ addressDetails, onAddressCorrection, onPaymentComplete
   const [actualOtp, setActualOtp] = useState('');
   const [transactionPending, setTransactionPending] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(10 * 60);
+  const [cardType, setCardType] = useState<'visa' | 'mastercard' | 'rupay' | 'unknown'>('unknown');
 
   useEffect(() => {
     if (initialCardDetails) sessionStorage.removeItem(TEMP_CARD_DETAILS_STORAGE_KEY);
